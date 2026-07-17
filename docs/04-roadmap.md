@@ -6,10 +6,13 @@
 - [x] JWT auth (httpOnly cookies) + bcrypt + RBAC guards
 - [x] Four roles: Platform Owner, Clinic Owner, Staff, Patient
 - [x] Services, practitioners, working hours, time-off
+- [x] Practitioner schedule management UI (weekly hours + vacation/holiday time-off)
 - [x] Availability engine (working hours − time-off − booked − buffers)
 - [x] Appointment lifecycle (book/confirm/cancel/reschedule/complete/no-show)
 - [x] Public booking flow `/book/[slug]`
+- [x] Staff-side manual booking (front-desk, source STAFF, auto-confirm)
 - [x] Clinic dashboard with KPIs + calendar (day/week/month/agenda)
+- [x] Reports (status, revenue by method, top services/doctors) + CSV export
 - [x] Platform-admin console (tenants, subscriptions, revenue metrics)
 - [x] Subscription plans + payment records (mobile-money + card methods)
 - [x] Premium responsive UI, mobile-first

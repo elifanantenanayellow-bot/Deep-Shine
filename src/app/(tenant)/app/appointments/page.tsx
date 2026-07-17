@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireMembership } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
 import { PageHeader } from "@/components/app-shell";
@@ -23,6 +24,11 @@ export default async function AppointmentsPage() {
       <PageHeader
         title="Appointments"
         description="Confirm, complete or cancel bookings. Everything is scoped to your clinic."
+        action={
+          <Link href="/app/appointments/new">
+            <Button>New appointment</Button>
+          </Link>
+        }
       />
 
       <Card className="overflow-x-auto">

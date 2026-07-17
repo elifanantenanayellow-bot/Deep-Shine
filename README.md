@@ -25,7 +25,10 @@ access another clinic's data.
 - Availability engine (working hours − time-off − booked − buffers)
 - Appointment lifecycle: book / confirm / cancel / complete / no-show
 - Public booking flow at `/book/[slug]` (service → practitioner → time → details)
+- Staff-side manual booking from the front desk
+- Practitioner schedule management: weekly working hours + vacation/holiday time-off
 - Clinic dashboard with KPIs + week calendar, patients, services, settings
+- Reports (status, revenue by method, top services/doctors) with CSV export
 - Platform-admin console: tenants, suspend/reactivate, subscriptions, MRR/ARR
 - Subscription plans + payment records (MVola, Orange Money, Airtel Money, cash, cards)
 - Seed data: a platform owner + two clinics you can log into immediately

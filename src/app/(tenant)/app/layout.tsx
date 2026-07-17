@@ -7,7 +7,9 @@ const nav: NavItem[] = [
   { href: "/app/calendar", label: "Calendar" },
   { href: "/app/appointments", label: "Appointments" },
   { href: "/app/patients", label: "Patients" },
+  { href: "/app/practitioners", label: "Practitioners" },
   { href: "/app/services", label: "Services" },
+  { href: "/app/reports", label: "Reports" },
   { href: "/app/settings", label: "Settings" },
 ];
 
