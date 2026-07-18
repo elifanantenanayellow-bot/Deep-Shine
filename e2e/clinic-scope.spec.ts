@@ -24,9 +24,9 @@ test("clinic portal is scoped to its own clinic", async ({ page }) => {
   await page.goto("/clinic/appointments", { waitUntil: "networkidle" });
   await waitForHydration(page);
   const foreignDoctorShown = await page.evaluate(() => {
-    const raw = localStorage.getItem("deepshine-demo-v3");
+    const raw = localStorage.getItem("deepshine-demo-v4");
     if (!raw) return "no-store";
-    const data = JSON.parse(raw);
+    const data = JSON.parse(raw).data;
     const foreign = new Set(
       data.doctors
         .filter((d: { clinicId: string }) => d.clinicId !== "cl-1")

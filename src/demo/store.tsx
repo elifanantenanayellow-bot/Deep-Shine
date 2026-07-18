@@ -21,9 +21,21 @@ import type {
   WeeklyHours,
 } from "./types";
 
-// Bump the suffix whenever DemoData's shape changes — older persisted
-// payloads are ignored and the demo reseeds instead of crashing.
-const STORAGE_KEY = "deepshine-demo-v3";
+// Bump the suffix whenever the persisted shape changes — older payloads are
+// ignored and the demo reseeds instead of crashing.
+const STORAGE_KEY = "deepshine-demo-v4";
+
+// Persisted envelope: data plus the day it was seeded. Data seeded on a
+// previous day decays ("today" drifts out of the busy window), so it is
+// regenerated automatically.
+interface StoredEnvelope {
+  seededAt: string; // YYYY-MM-DD
+  data: DemoData;
+}
+
+function todayStamp(): string {
+  return new Date().toISOString().slice(0, 10);
+}
 
 interface BookInput {
   patientId: string;
@@ -99,14 +111,28 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
   // Initialize client-side only (no SSR/hydration drift, gives a loading beat).
   useEffect(() => {
     let loaded: DemoData | null = null;
+    let wasStale = false;
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) loaded = JSON.parse(raw) as DemoData;
+      if (raw) {
+        const env = JSON.parse(raw) as Partial<StoredEnvelope>;
+        if (env && env.data && env.seededAt === todayStamp()) {
+          loaded = env.data;
+        } else if (env && env.data) {
+          wasStale = true; // valid but from a previous day → reseed
+        }
+      }
     } catch {
       loaded = null;
     }
     const seeded = loaded ?? generateDemoData(new Date());
     setData(seeded);
+    if (wasStale) {
+      setTimeout(
+        () => toast.info("Demo data refreshed for today", { duration: 2500 }),
+        600,
+      );
+    }
 
     // Presenter mode: armed/disarmed by URL param, persisted across pages.
     try {
@@ -126,7 +152,8 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!ready) return;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      const envelope: StoredEnvelope = { seededAt: todayStamp(), data };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(envelope));
     } catch {
       /* ignore quota errors in demo */
     }
