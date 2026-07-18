@@ -66,15 +66,17 @@ export function AreaTrend({
   money,
   color = CHART_COLORS[0],
   height = 240,
+  label = "Trend chart",
 }: {
   data: Record<string, unknown>[];
   dataKey: string;
   money?: boolean;
   color?: string;
   height?: number;
+  label?: string;
 }) {
   return (
-    <div style={{ width: "100%", height }}>
+    <div style={{ width: "100%", height }} role="img" aria-label={label}>
       <ResponsiveContainer>
         <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid vertical={false} stroke="hsl(var(--border))" strokeOpacity={0.6} />
@@ -107,15 +109,17 @@ export function BarsChart({
   money,
   color = CHART_COLORS[1],
   height = 240,
+  label = "Bar chart",
 }: {
   data: Record<string, unknown>[];
   dataKey: string;
   money?: boolean;
   color?: string;
   height?: number;
+  label?: string;
 }) {
   return (
-    <div style={{ width: "100%", height }}>
+    <div style={{ width: "100%", height }} role="img" aria-label={label}>
       <ResponsiveContainer>
         <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid vertical={false} stroke="hsl(var(--border))" strokeOpacity={0.6} />
@@ -134,15 +138,17 @@ export function DonutChart({
   money,
   height = 240,
   colors = CHART_COLORS,
+  label = "Breakdown chart",
 }: {
   data: { name: string; value: number }[];
   money?: boolean;
   height?: number;
   colors?: string[];
+  label?: string;
 }) {
   const total = data.reduce((s, d) => s + d.value, 0);
   return (
-    <div style={{ width: "100%", height }} className="relative">
+    <div style={{ width: "100%", height }} className="relative" role="img" aria-label={label}>
       <ResponsiveContainer>
         <PieChart>
           <Pie

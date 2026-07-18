@@ -85,10 +85,10 @@ export default function DoctorDashboard() {
                         </div>
                         {a.status === "upcoming" ? (
                           <div className="flex gap-1">
-                            <button onClick={() => markStatus(a.id, "completed")} className="grid h-7 w-7 place-items-center rounded-md text-emerald-600 hover:bg-emerald-500/10" title="Mark completed">
+                            <button onClick={() => markStatus(a.id, "completed")} className="grid h-7 w-7 place-items-center rounded-md text-emerald-600 hover:bg-emerald-500/10" title="Mark completed" aria-label={`Mark ${patientName(data, a.patientId)} completed`}>
                               <CheckCircle2 className="h-4 w-4" />
                             </button>
-                            <button onClick={() => markStatus(a.id, "no_show")} className="grid h-7 w-7 place-items-center rounded-md text-amber-600 hover:bg-amber-500/10" title="Mark no-show">
+                            <button onClick={() => markStatus(a.id, "no_show")} className="grid h-7 w-7 place-items-center rounded-md text-amber-600 hover:bg-amber-500/10" title="Mark no-show" aria-label={`Mark ${patientName(data, a.patientId)} as no-show`}>
                               <XCircle className="h-4 w-4" />
                             </button>
                           </div>
