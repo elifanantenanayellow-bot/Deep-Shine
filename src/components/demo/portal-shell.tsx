@@ -33,7 +33,7 @@ export function PortalShell({
   accent?: string;
 }) {
   const pathname = usePathname();
-  const { resetDemo } = useDemo();
+  const { resetDemo, presenterMode } = useDemo();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const isActive = (href: string) =>
@@ -134,6 +134,15 @@ export function PortalShell({
             {new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
           </div>
           <div className="ml-auto flex items-center gap-3">
+            {presenterMode && (
+              <span
+                className="hidden items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-600 sm:inline-flex"
+                title="Presenter mode: payments always succeed, Shift+R reseeds. Disarm with ?presenter=0"
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                Presenter
+              </span>
+            )}
             <NotificationBell />
             <div className="flex items-center gap-2">
               <span

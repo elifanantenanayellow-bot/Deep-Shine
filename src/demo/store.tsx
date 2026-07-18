@@ -36,9 +36,14 @@ interface BookInput {
   paymentStatus: PaymentStatus;
 }
 
+const PRESENTER_KEY = "deepshine-presenter";
+
 interface DemoContextValue {
   ready: boolean;
   data: DemoData;
+  // Presenter mode (armed via ?presenter=1): payments always succeed and
+  // Shift+R reseeds — for live pitches where randomness is a liability.
+  presenterMode: boolean;
   // current demo personas
   currentPatientId: string;
   currentDoctorId: string;
@@ -86,6 +91,7 @@ const EMPTY: DemoData = {
 export function DemoProvider({ children }: { children: React.ReactNode }) {
   const [data, setData] = useState<DemoData>(EMPTY);
   const [ready, setReady] = useState(false);
+  const [presenterMode, setPresenterMode] = useState(false);
   const [currentPatientId, setCurrentPatientId] = useState("pt-1");
   const currentDoctorId = "dr-1";
   const idRef = useRef(100000);
@@ -101,6 +107,17 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
     }
     const seeded = loaded ?? generateDemoData(new Date());
     setData(seeded);
+
+    // Presenter mode: armed/disarmed by URL param, persisted across pages.
+    try {
+      const param = new URLSearchParams(window.location.search).get("presenter");
+      if (param === "1") localStorage.setItem(PRESENTER_KEY, "1");
+      if (param === "0") localStorage.removeItem(PRESENTER_KEY);
+      setPresenterMode(localStorage.getItem(PRESENTER_KEY) === "1");
+    } catch {
+      /* ignore */
+    }
+
     const t = setTimeout(() => setReady(true), 450);
     return () => clearTimeout(t);
   }, []);
@@ -319,25 +336,48 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
     toast.success("Demo data reset");
   }, []);
 
+  // Shift+R anywhere outside a form field: instant reseed for presenters.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.shiftKey || e.key.toLowerCase() !== "r") return;
+      const t = e.target as HTMLElement | null;
+      const tag = t?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || t?.isContentEditable) {
+        return;
+      }
+      e.preventDefault();
+      resetDemo();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [resetDemo]);
+
   // Simulate a mobile-money / card payment with a realistic delay + outcomes.
+  // In presenter mode payments always succeed, faster — live pitches should
+  // never randomly hit a failure screen.
   const simulatePayment = useCallback(
     (_method: PaymentMethod): Promise<PaymentStatus> => {
       return new Promise((resolve) => {
+        if (presenterMode) {
+          setTimeout(() => resolve("paid"), 900);
+          return;
+        }
         setTimeout(() => {
-          // ~82% success, ~12% pending, ~6% fail — deterministic-ish by random.
+          // ~82% success, ~12% pending, ~6% fail.
           const r = Math.random();
           const status: PaymentStatus = r < 0.82 ? "paid" : r < 0.94 ? "pending" : "failed";
           resolve(status);
         }, 1600);
       });
     },
-    [],
+    [presenterMode],
   );
 
   const value = useMemo<DemoContextValue>(
     () => ({
       ready,
       data,
+      presenterMode,
       currentPatientId,
       currentDoctorId,
       setCurrentPatientId,
@@ -357,6 +397,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
     [
       ready,
       data,
+      presenterMode,
       currentPatientId,
       currentDoctorId,
       book,

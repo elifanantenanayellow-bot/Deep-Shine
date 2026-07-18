@@ -29,7 +29,7 @@ export function PaymentModal({
   onClose: () => void;
   onComplete: (method: PaymentMethod, status: PaymentStatus) => void;
 }) {
-  const { simulatePayment } = useDemo();
+  const { simulatePayment, presenterMode } = useDemo();
   const [phase, setPhase] = useState<Phase>("select");
   const [method, setMethod] = useState<PaymentMethod>("MVola");
   const [result, setResult] = useState<PaymentStatus | null>(null);
@@ -98,7 +98,9 @@ export function PaymentModal({
                 Pay {formatMoney(amount)}
               </Button>
               <p className="mt-2 text-center text-[11px] text-muted-foreground">
-                Demo only — no real transaction. Outcome is simulated.
+                {presenterMode
+                  ? "Presenter mode — payment will succeed."
+                  : "Demo only — no real transaction. Outcome is simulated."}
               </p>
             </motion.div>
           )}

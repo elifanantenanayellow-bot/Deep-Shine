@@ -28,6 +28,11 @@ statistics; payments simulate success / pending / failure; notifications appear
 as toasts and in the bell menu. Use **Reset demo data** in any sidebar to start
 fresh.
 
+**Presenting live?** Open any page with `?presenter=1`: payments always
+succeed (no random failure screens mid-pitch), a "Presenter" pill confirms
+it's armed, and **Shift+R** reseeds the data instantly. Disarm with
+`?presenter=0`.
+
 ---
 
 ## Production foundation (optional)
