@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import { Plus, Star } from "lucide-react";
 import { useDemo } from "@/demo/store";
-import { specialtyName, clinicName } from "@/demo/selectors";
+import { DEMO_CLINIC_ID } from "@/demo/data";
+import { specialtyName } from "@/demo/selectors";
 import { PageTitle, DashboardSkeleton } from "@/components/demo/portal-shell";
 import { Avatar } from "@/components/demo/primitives";
 import { Stagger, StaggerItem } from "@/components/demo/motion";
@@ -14,8 +15,12 @@ import { formatMoney } from "@/lib/utils";
 export default function ClinicDoctors() {
   const { ready, data, addDoctor } = useDemo();
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ name: "", specialtyId: "sp-gen", clinicId: "cl-1", fee: "50000" });
+  const [form, setForm] = useState({ name: "", specialtyId: "sp-gen", fee: "50000" });
 
+  const roster = useMemo(
+    () => data.doctors.filter((d) => d.clinicId === DEMO_CLINIC_ID),
+    [data.doctors],
+  );
   const counts = useMemo(() => {
     const m = new Map<string, number>();
     for (const a of data.appointments) m.set(a.doctorId, (m.get(a.doctorId) ?? 0) + 1);
@@ -29,10 +34,10 @@ export default function ClinicDoctors() {
     addDoctor({
       name: form.name.trim(),
       specialtyId: form.specialtyId,
-      clinicId: form.clinicId,
+      clinicId: DEMO_CLINIC_ID,
       consultationFee: Number(form.fee) || 50000,
     });
-    setForm({ name: "", specialtyId: "sp-gen", clinicId: "cl-1", fee: "50000" });
+    setForm({ name: "", specialtyId: "sp-gen", fee: "50000" });
     setOpen(false);
   }
 
@@ -40,12 +45,12 @@ export default function ClinicDoctors() {
     <>
       <PageTitle
         title="Doctors"
-        subtitle={`${data.doctors.length} practitioners across ${data.clinics.length} clinics`}
+        subtitle={`${roster.length} practitioners at Clinique Sourire`}
         action={<Button className="gap-2" onClick={() => setOpen(true)}><Plus className="h-4 w-4" /> Add doctor</Button>}
       />
 
       <Stagger className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {data.doctors.map((d) => (
+        {roster.map((d) => (
           <StaggerItem key={d.id}>
             <Card className="p-5">
               <div className="flex items-center gap-3">
@@ -61,8 +66,8 @@ export default function ClinicDoctors() {
                 <Stat label="Years" value={d.experienceYears} />
               </div>
               <div className="mt-3 flex items-center justify-between border-t border-border pt-3 text-sm">
-                <span className="text-muted-foreground">{clinicName(data, d.clinicId)}</span>
-                <span className="font-medium">{formatMoney(d.consultationFee)}</span>
+                <span className="truncate text-muted-foreground">{d.languages.join(" · ")}</span>
+                <span className="shrink-0 font-medium">{formatMoney(d.consultationFee)}</span>
               </div>
             </Card>
           </StaggerItem>
@@ -84,9 +89,7 @@ export default function ClinicDoctors() {
             </div>
             <div className="space-y-1.5">
               <Label>Clinic</Label>
-              <select value={form.clinicId} onChange={(e) => setForm({ ...form, clinicId: e.target.value })} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                {data.clinics.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+              <Input value="Clinique Sourire" disabled title="Doctors you add join your clinic" />
             </div>
           </div>
           <div className="space-y-1.5">

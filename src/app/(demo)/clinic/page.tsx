@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { CalendarCheck, Wallet, Users, Percent, TrendingUp } from "lucide-react";
 import { useDemo } from "@/demo/store";
+import { DEMO_CLINIC_ID } from "@/demo/data";
 import {
   computeKpis,
   dailySeries,
@@ -28,19 +29,23 @@ export default function ClinicDashboard() {
 
   const stats = useMemo(() => {
     const now = new Date();
-    const kpis = computeKpis(data.appointments, data.patients.length);
+    // Everything on this portal is scoped to the tenant clinic.
+    const appts = data.appointments.filter((a) => a.clinicId === DEMO_CLINIC_ID);
+    const patientIds = new Set(appts.map((a) => a.patientId));
+    const patients = data.patients.filter((p) => patientIds.has(p.id));
+    const kpis = computeKpis(appts, patients.length);
     return {
       kpis,
-      today: data.appointments.filter((a) => isSameDay(new Date(a.start), now)).length,
-      series: dailySeries(data.appointments, now, 30),
-      byStatus: appointmentsByStatus(data.appointments),
-      leaders: topDoctors(data, data.appointments, 5),
-      growth: patientGrowth(data.patients, now),
+      today: appts.filter((a) => isSameDay(new Date(a.start), now)).length,
+      series: dailySeries(appts, now, 30),
+      byStatus: appointmentsByStatus(appts),
+      leaders: topDoctors(data, appts, 5),
+      growth: patientGrowth(patients, now),
       deltas: {
-        appointments: monthDelta(data.appointments, now, "appointments"),
-        revenue: monthDelta(data.appointments, now, "revenue"),
-        patients: monthDelta(data.appointments, now, "patients"),
-        noShows: monthDelta(data.appointments, now, "noShows"),
+        appointments: monthDelta(appts, now, "appointments"),
+        revenue: monthDelta(appts, now, "revenue"),
+        patients: monthDelta(appts, now, "patients"),
+        noShows: monthDelta(appts, now, "noShows"),
       },
     };
   }, [data]);

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Search, Download } from "lucide-react";
 import { toast } from "sonner";
 import { useDemo } from "@/demo/store";
+import { DEMO_CLINIC_ID } from "@/demo/data";
 import { PageTitle, DashboardSkeleton } from "@/components/demo/portal-shell";
 import { Avatar, EmptyState } from "@/components/demo/primitives";
 import { FadeIn } from "@/components/demo/motion";
@@ -18,8 +19,11 @@ export default function ClinicPatients() {
   const [page, setPage] = useState(1);
 
   const enriched = useMemo(() => {
+    // Only patients this clinic has actually seen — a clinic never gets the
+    // whole platform's patient list.
     const visits = new Map<string, { count: number; spent: number; last: string }>();
     for (const a of data.appointments) {
+      if (a.clinicId !== DEMO_CLINIC_ID) continue;
       const e = visits.get(a.patientId) ?? { count: 0, spent: 0, last: a.start };
       e.count += 1;
       if (a.paymentStatus === "paid") e.spent += a.fee;
@@ -27,7 +31,8 @@ export default function ClinicPatients() {
       visits.set(a.patientId, e);
     }
     return data.patients
-      .map((p) => ({ p, v: visits.get(p.id) ?? { count: 0, spent: 0, last: p.joinedAt } }))
+      .filter((p) => visits.has(p.id))
+      .map((p) => ({ p, v: visits.get(p.id)! }))
       .filter(({ p }) => (q ? `${p.name} ${p.phone} ${p.email}`.toLowerCase().includes(q.toLowerCase()) : true));
   }, [data, q]);
 
@@ -41,7 +46,7 @@ export default function ClinicPatients() {
     <>
       <PageTitle
         title="Patients"
-        subtitle={`${data.patients.length} registered patients`}
+        subtitle={`${enriched.length} patients seen at Clinique Sourire`}
         action={<Button variant="outline" className="gap-2" onClick={() => toast.success("Exported patients.csv (demo)")}><Download className="h-4 w-4" /> Export</Button>}
       />
 

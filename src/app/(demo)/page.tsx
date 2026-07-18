@@ -25,7 +25,7 @@ const features = [
   { icon: Calendar, title: "Smart scheduling", body: "Live availability, buffers, breaks and vacation mode. Double-bookings become impossible." },
   { icon: Smartphone, title: "Mobile money built-in", body: "MVola, Orange Money and Airtel Money — plus cards. The way Madagascar actually pays." },
   { icon: Bell, title: "Automatic reminders", body: "Email, SMS & WhatsApp reminders at 24h, 2h and 15m. Cut no-shows by up to 60%." },
-  { icon: BarChart3, title: "Analytics that matter", body: "Revenue, occupancy, no-show rate, top doctors — the numbers that grow a clinic." },
+  { icon: BarChart3, title: "Analytics that matter", body: "Revenue, completion rate, no-shows, top doctors — the numbers that grow a clinic." },
   { icon: Users, title: "Every role covered", body: "Dedicated portals for patients, doctors and clinic admins. Everyone sees exactly what they need." },
   { icon: ShieldCheck, title: "Private & secure", body: "Each clinic gets an isolated workspace. Your patient data never leaves your practice." },
 ];

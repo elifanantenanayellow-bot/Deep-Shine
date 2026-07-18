@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo } from "react";
-import { Download, Wallet, Clock, CalendarCheck, Building2 } from "lucide-react";
+import { Download, Wallet, Clock, CalendarCheck, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { useDemo } from "@/demo/store";
-import { computeKpis, dailySeries, revenueByMethod, topDoctors, clinicName, monthDelta } from "@/demo/selectors";
+import { DEMO_CLINIC_ID } from "@/demo/data";
+import { computeKpis, dailySeries, revenueByMethod, topDoctors, specialtyName, monthDelta } from "@/demo/selectors";
 import { PageTitle, DashboardSkeleton } from "@/components/demo/portal-shell";
 import { StatCard } from "@/components/demo/stat-card";
 import { AreaTrend, BarsChart, DonutChart, ChartLegend } from "@/components/demo/charts";
@@ -18,21 +19,25 @@ export default function ClinicRevenue() {
 
   const model = useMemo(() => {
     const now = new Date();
-    const kpis = computeKpis(data.appointments, data.patients.length);
-    const byClinic = data.clinics.map((c) => ({
-      label: c.name.replace(/^(Clinique|Cabinet|Centre|Polyclinique|Espace)\s+/i, ""),
-      revenue: data.appointments
-        .filter((a) => a.clinicId === c.id && a.paymentStatus === "paid")
-        .reduce((s, a) => s + a.fee, 0),
+    // Scoped to this clinic — a tenant never sees other clinics' finances.
+    const appts = data.appointments.filter((a) => a.clinicId === DEMO_CLINIC_ID);
+    const patients = new Set(appts.map((a) => a.patientId)).size;
+    const kpis = computeKpis(appts, patients);
+    const leaders = topDoctors(data, appts, 6);
+    const byDoctor = leaders.map((l) => ({
+      label: l.doctor.name.replace(/^Dr\.\s*/, "").split(" ")[0],
+      revenue: l.revenue,
     }));
+    const outcomes = kpis.completed + kpis.noShow + kpis.cancelled;
     return {
       kpis,
-      series: dailySeries(data.appointments, now, 30),
-      byMethod: revenueByMethod(data.appointments),
-      leaders: topDoctors(data, data.appointments, 6),
-      byClinic,
-      revenueDelta: monthDelta(data.appointments, now, "revenue"),
-      apptDelta: monthDelta(data.appointments, now, "appointments"),
+      completionRate: outcomes ? Math.round((kpis.completed / outcomes) * 100) : 0,
+      series: dailySeries(appts, now, 30),
+      byMethod: revenueByMethod(appts),
+      leaders,
+      byDoctor,
+      revenueDelta: monthDelta(appts, now, "revenue"),
+      apptDelta: monthDelta(appts, now, "appointments"),
     };
   }, [data]);
 
@@ -56,7 +61,7 @@ export default function ClinicRevenue() {
         <StatCard index={0} label="Revenue (paid)" value={formatMoney(kpis.paidRevenue)} icon={<Wallet className="h-4 w-4" />} tone="emerald" delta={model.revenueDelta} />
         <StatCard index={1} label="Pending payments" value={formatMoney(kpis.pendingRevenue)} icon={<Clock className="h-4 w-4" />} tone="amber" />
         <StatCard index={2} label="Total appointments" value={String(kpis.totalAppointments)} icon={<CalendarCheck className="h-4 w-4" />} tone="primary" delta={model.apptDelta} />
-        <StatCard index={3} label="Occupancy" value={`${kpis.occupancy}%`} icon={<Building2 className="h-4 w-4" />} tone="sky" />
+        <StatCard index={3} label="Completion rate" value={`${model.completionRate}%`} icon={<CheckCircle2 className="h-4 w-4" />} tone="sky" />
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -78,8 +83,8 @@ export default function ClinicRevenue() {
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
         <FadeIn>
           <Card className="p-5">
-            <h2 className="mb-4 font-semibold">Revenue by clinic</h2>
-            <BarsChart data={model.byClinic} dataKey="revenue" money color="#6366f1" height={260} />
+            <h2 className="mb-4 font-semibold">Revenue by doctor</h2>
+            <BarsChart data={model.byDoctor} dataKey="revenue" money color="#6366f1" height={260} />
           </Card>
         </FadeIn>
         <FadeIn delay={0.1}>
@@ -92,7 +97,7 @@ export default function ClinicRevenue() {
                   <Avatar name={l.doctor.name} hue={l.doctor.avatarHue} size={34} />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{l.doctor.name}</p>
-                    <p className="text-xs text-muted-foreground">{clinicName(data, l.doctor.clinicId)}</p>
+                    <p className="text-xs text-muted-foreground">{specialtyName(data, l.doctor.specialtyId)}</p>
                   </div>
                   <span className="text-sm font-semibold">{formatMoney(l.revenue)}</span>
                 </li>

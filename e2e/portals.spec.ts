@@ -19,7 +19,7 @@ test("clinic admin can add a doctor and the roster updates", async ({
   await page.goto("/clinic/doctors", { waitUntil: "networkidle" });
   await waitForHydration(page);
 
-  const before = await page.locator("text=/practitioners across/").textContent();
+  const before = await page.locator("text=/practitioners at/").textContent();
   await page.getByRole("button", { name: /add doctor/i }).first().click();
   await expect(page.getByText("Add a doctor")).toBeVisible();
   await page.getByPlaceholder("Dr. Naina Rakoto").fill("Dr. E2E Test");
@@ -27,7 +27,7 @@ test("clinic admin can add a doctor and the roster updates", async ({
     .locator("div[role=dialog] button", { hasText: "Add doctor" })
     .click();
   await expect(page.getByText("Dr. E2E Test").first()).toBeVisible();
-  const after = await page.locator("text=/practitioners across/").textContent();
+  const after = await page.locator("text=/practitioners at/").textContent();
   expect(before).not.toEqual(after);
   expect(errors).toEqual([]);
 });

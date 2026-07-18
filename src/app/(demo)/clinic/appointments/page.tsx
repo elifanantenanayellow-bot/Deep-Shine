@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { CalendarCheck } from "lucide-react";
 import { useDemo } from "@/demo/store";
+import { DEMO_CLINIC_ID } from "@/demo/data";
 import { doctorName, patientName, specialtyName } from "@/demo/selectors";
 import { PageTitle, DashboardSkeleton } from "@/components/demo/portal-shell";
 import { StatusPill, PaymentPill, EmptyState, SegmentedTabs } from "@/components/demo/primitives";
@@ -18,7 +19,9 @@ export default function ClinicAppointments() {
   const [filter, setFilter] = useState<Filter>("upcoming");
 
   const list = useMemo(() => {
-    const sorted = [...data.appointments].sort((a, b) => +new Date(b.start) - +new Date(a.start));
+    const sorted = data.appointments
+      .filter((a) => a.clinicId === DEMO_CLINIC_ID)
+      .sort((a, b) => +new Date(b.start) - +new Date(a.start));
     if (filter === "all") return sorted.slice(0, 80);
     return sorted.filter((a) => a.status === filter).slice(0, 80);
   }, [data.appointments, filter]);

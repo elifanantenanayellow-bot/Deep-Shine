@@ -23,7 +23,7 @@ import type {
 
 // Bump the suffix whenever DemoData's shape changes — older persisted
 // payloads are ignored and the demo reseeds instead of crashing.
-const STORAGE_KEY = "deepshine-demo-v2";
+const STORAGE_KEY = "deepshine-demo-v3";
 
 interface BookInput {
   patientId: string;

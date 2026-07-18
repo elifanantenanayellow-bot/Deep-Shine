@@ -84,7 +84,9 @@ export function generateDemoData(now: Date): DemoData {
     const last = pick(rng, LAST);
     const name = `${pick(rng, DOCTOR_TITLES)} ${first} ${last}`;
     const specialty = SPECIALTIES[i % SPECIALTIES.length];
-    const clinic = pick(rng, CLINICS);
+    // Clinique Sourire (cl-1) is the flagship demo clinic: 8 of 20 doctors
+    // work there (including dr-1) so its scoped portal looks busy.
+    const clinic = i < 8 ? CLINICS[0] : pick(rng, CLINICS.slice(1));
     const nextDays = Math.floor(rng() * 5);
     const nextAvail = new Date(now);
     nextAvail.setDate(nextAvail.getDate() + nextDays);
@@ -128,22 +130,41 @@ export function generateDemoData(now: Date): DemoData {
     });
   }
 
-  // Appointments — spread across last 60 days and next 21 days
+  // Appointments — spread across last 60 days and next 21 days, generated
+  // per doctor so every practitioner has a believable schedule. Flagship
+  // (cl-1) doctors see 1–2 patients/weekday; others are occasional.
   const methods: PaymentMethod[] = ["MVola", "Orange Money", "Airtel Money", "Credit Card"];
   const appointments: Appointment[] = [];
   let counter = 1;
   for (let d = -60; d <= 21; d++) {
-    // busier on weekdays
     const day = new Date(now);
     day.setDate(day.getDate() + d);
     const weekday = day.getDay();
     if (weekday === 0) continue; // clinics closed Sunday
-    const perDay = 3 + Math.floor(rng() * 7);
-    for (let k = 0; k < perDay; k++) {
-      const doctor = pick(rng, doctors);
+    const saturday = weekday === 6;
+    const dayLoad: { doctor: Doctor }[] = [];
+    for (const doctor of doctors) {
+      const flagship = doctor.clinicId === "cl-1";
+      let count: number;
+      if (flagship) {
+        count = saturday ? (rng() > 0.5 ? 1 : 0) : 1 + Math.floor(rng() * 2);
+      } else {
+        count = rng() < (saturday ? 0.15 : 0.35) ? 1 : 0;
+      }
+      for (let k = 0; k < count; k++) dayLoad.push({ doctor });
+    }
+    const usedSlots = new Set<string>();
+    for (const { doctor } of dayLoad) {
       const patient = pick(rng, patients);
-      const hour = 8 + Math.floor(rng() * 9);
-      const minute = rng() > 0.5 ? 30 : 0;
+      let hour = 8 + Math.floor(rng() * 9);
+      let minute = rng() > 0.5 ? 30 : 0;
+      // avoid double-booking the same doctor slot in the seed
+      let guard = 0;
+      while (usedSlots.has(`${doctor.id}-${hour}-${minute}`) && guard++ < 20) {
+        hour = 8 + Math.floor(rng() * 9);
+        minute = rng() > 0.5 ? 30 : 0;
+      }
+      usedSlots.add(`${doctor.id}-${hour}-${minute}`);
       const start = new Date(day);
       start.setHours(hour, minute, 0, 0);
 
@@ -246,4 +267,6 @@ export function generateDemoData(now: Date): DemoData {
 
 export const SPECIALTY_LIST = SPECIALTIES;
 export const CLINIC_LIST = CLINICS;
+// The clinic-admin portal is scoped to this tenant (Clinique Sourire).
+export const DEMO_CLINIC_ID = "cl-1";
 export const PAYMENT_METHODS: PaymentMethod[] = ["MVola", "Orange Money", "Airtel Money", "Credit Card"];
