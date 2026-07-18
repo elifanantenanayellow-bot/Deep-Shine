@@ -32,17 +32,32 @@ export function BookingWizard({
   open,
   onClose,
   presetDoctor,
+  presetSlotIso,
 }: {
   open: boolean;
   onClose: () => void;
   presetDoctor?: Doctor;
+  // A concrete slot the user already clicked (e.g. on the doctor profile):
+  // the wizard opens straight at review with day + time set. Remount via
+  // `key` when this changes.
+  presetSlotIso?: string;
 }) {
   const { data, book, currentPatientId } = useDemo();
-  const [step, setStep] = useState<Step>(presetDoctor ? "date" : "specialty");
+  const hasPresetSlot = Boolean(presetDoctor && presetSlotIso);
+  const [step, setStep] = useState<Step>(
+    hasPresetSlot ? "review" : presetDoctor ? "date" : "specialty",
+  );
   const [specialtyId, setSpecialtyId] = useState<string | null>(presetDoctor?.specialtyId ?? null);
   const [doctor, setDoctor] = useState<Doctor | null>(presetDoctor ?? null);
-  const [day, setDay] = useState<Date | null>(null);
-  const [slotIso, setSlotIso] = useState<string | null>(null);
+  const [day, setDay] = useState<Date | null>(() => {
+    if (!hasPresetSlot) return null;
+    const d = new Date(presetSlotIso!);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  });
+  const [slotIso, setSlotIso] = useState<string | null>(
+    hasPresetSlot ? presetSlotIso! : null,
+  );
   const [reason, setReason] = useState("Consultation générale");
   const [payOpen, setPayOpen] = useState(false);
 
@@ -57,11 +72,18 @@ export function BookingWizard({
   );
 
   function reset() {
-    setStep(presetDoctor ? "date" : "specialty");
+    setStep(hasPresetSlot ? "review" : presetDoctor ? "date" : "specialty");
     setSpecialtyId(presetDoctor?.specialtyId ?? null);
     setDoctor(presetDoctor ?? null);
-    setDay(null);
-    setSlotIso(null);
+    if (hasPresetSlot) {
+      const d = new Date(presetSlotIso!);
+      d.setHours(0, 0, 0, 0);
+      setDay(d);
+      setSlotIso(presetSlotIso!);
+    } else {
+      setDay(null);
+      setSlotIso(null);
+    }
   }
 
   function close() {

@@ -19,6 +19,7 @@ export default function DoctorProfile({ params }: { params: Promise<{ id: string
   const { ready, data } = useDemo();
   const router = useRouter();
   const [bookOpen, setBookOpen] = useState(false);
+  const [pickedSlotIso, setPickedSlotIso] = useState<string | undefined>(undefined);
 
   const doctor = data.doctors.find((d) => d.id === id);
   const clinic = data.clinics.find((c) => c.id === doctor?.clinicId);
@@ -111,7 +112,10 @@ export default function DoctorProfile({ params }: { params: Promise<{ id: string
                 <button
                   key={s.iso}
                   disabled={s.taken}
-                  onClick={() => setBookOpen(true)}
+                  onClick={() => {
+                    setPickedSlotIso(s.iso);
+                    setBookOpen(true);
+                  }}
                   className={cn(
                     "rounded-md border py-2 text-xs transition-colors",
                     s.taken
@@ -123,7 +127,14 @@ export default function DoctorProfile({ params }: { params: Promise<{ id: string
                 </button>
               ))}
             </div>
-            <Button className="mt-5 w-full gap-2" size="lg" onClick={() => setBookOpen(true)}>
+            <Button
+              className="mt-5 w-full gap-2"
+              size="lg"
+              onClick={() => {
+                setPickedSlotIso(undefined);
+                setBookOpen(true);
+              }}
+            >
               <CalendarPlus className="h-4 w-4" /> Book appointment
             </Button>
             <p className="mt-2 text-center text-xs text-muted-foreground">
@@ -133,7 +144,13 @@ export default function DoctorProfile({ params }: { params: Promise<{ id: string
         </FadeIn>
       </div>
 
-      <BookingWizard open={bookOpen} onClose={() => setBookOpen(false)} presetDoctor={doctor} />
+      <BookingWizard
+        key={pickedSlotIso ?? "no-slot"}
+        open={bookOpen}
+        onClose={() => setBookOpen(false)}
+        presetDoctor={doctor}
+        presetSlotIso={pickedSlotIso}
+      />
     </>
   );
 }
