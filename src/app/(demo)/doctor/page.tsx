@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { CalendarClock, Users, Wallet, TrendingUp, CheckCircle2, XCircle } from "lucide-react";
 import { useDemo } from "@/demo/store";
-import { patientName, dailySeries, isSameDay } from "@/demo/selectors";
+import { patientName, dailySeries, isSameDay, monthDelta } from "@/demo/selectors";
 import { PageTitle, DashboardSkeleton } from "@/components/demo/portal-shell";
 import { StatCard } from "@/components/demo/stat-card";
 import { Avatar, StatusPill, EmptyState } from "@/components/demo/primitives";
@@ -32,16 +32,21 @@ export default function DoctorDashboard() {
   const completed = mine.filter((a) => a.status === "completed").length;
   const series = dailySeries(mine, now, 14);
   const me = data.doctors.find((d) => d.id === currentDoctorId);
+  const deltas = {
+    appointments: monthDelta(mine, now, "appointments"),
+    patients: monthDelta(mine, now, "patients"),
+    revenue: monthDelta(mine, now, "revenue"),
+  };
 
   return (
     <>
       <PageTitle title={`Welcome, ${me?.name.replace("Dr. ", "Dr ")}`} subtitle="Your day at a glance." />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard index={0} label="Today's appointments" value={String(today.length)} icon={<CalendarClock className="h-4 w-4" />} tone="primary" delta={8} />
-        <StatCard index={1} label="Total patients" value={String(uniquePatients)} icon={<Users className="h-4 w-4" />} tone="sky" delta={5} />
-        <StatCard index={2} label="Earnings (paid)" value={formatMoney(earnings)} icon={<Wallet className="h-4 w-4" />} tone="emerald" delta={12} />
-        <StatCard index={3} label="Completed visits" value={String(completed)} icon={<TrendingUp className="h-4 w-4" />} tone="violet" delta={-3} />
+        <StatCard index={0} label="Today's appointments" value={String(today.length)} icon={<CalendarClock className="h-4 w-4" />} tone="primary" delta={deltas.appointments} />
+        <StatCard index={1} label="Total patients" value={String(uniquePatients)} icon={<Users className="h-4 w-4" />} tone="sky" delta={deltas.patients} />
+        <StatCard index={2} label="Earnings (paid)" value={formatMoney(earnings)} icon={<Wallet className="h-4 w-4" />} tone="emerald" delta={deltas.revenue} />
+        <StatCard index={3} label="Completed visits" value={String(completed)} icon={<TrendingUp className="h-4 w-4" />} tone="violet" />
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">

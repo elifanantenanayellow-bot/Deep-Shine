@@ -11,6 +11,7 @@ export function StatCard({
   delta,
   tone = "primary",
   index = 0,
+  goodWhenNegative = false,
 }: {
   label: string;
   value: string;
@@ -18,6 +19,8 @@ export function StatCard({
   delta?: number;
   tone?: "primary" | "emerald" | "amber" | "sky" | "violet" | "rose";
   index?: number;
+  // For metrics like no-shows where a falling number is the good direction.
+  goodWhenNegative?: boolean;
 }) {
   const tones: Record<string, string> = {
     primary: "bg-primary/10 text-primary",
@@ -43,7 +46,9 @@ export function StatCard({
         <p
           className={cn(
             "mt-1 inline-flex items-center gap-1 text-xs font-medium",
-            delta >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400",
+            (goodWhenNegative ? delta <= 0 : delta >= 0)
+              ? "text-emerald-600 dark:text-emerald-400"
+              : "text-rose-600 dark:text-rose-400",
           )}
         >
           {delta >= 0 ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}

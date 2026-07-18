@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { Wallet, TrendingUp, Clock, Percent } from "lucide-react";
 import { useDemo } from "@/demo/store";
-import { dailySeries, revenueByMethod, computeKpis } from "@/demo/selectors";
+import { dailySeries, revenueByMethod, computeKpis, monthDelta } from "@/demo/selectors";
 import { PageTitle, DashboardSkeleton } from "@/components/demo/portal-shell";
 import { StatCard } from "@/components/demo/stat-card";
 import { AreaTrend, DonutChart, ChartLegend, CHART_COLORS } from "@/components/demo/charts";
@@ -26,16 +26,18 @@ export default function DoctorEarnings() {
   const revSeries = dailySeries(mine, now, 30);
   const byMethod = revenueByMethod(mine);
   const avgFee = mine.length ? Math.round(kpis.paidRevenue / Math.max(1, mine.filter((a) => a.paymentStatus === "paid").length)) : 0;
+  const revenueDelta = monthDelta(mine, now, "revenue");
+  const noShowDelta = monthDelta(mine, now, "noShows");
 
   return (
     <>
       <PageTitle title="Earnings & analytics" subtitle="Your revenue performance over time." />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard index={0} label="Total earned" value={formatMoney(kpis.paidRevenue)} icon={<Wallet className="h-4 w-4" />} tone="emerald" delta={14} />
+        <StatCard index={0} label="Total earned" value={formatMoney(kpis.paidRevenue)} icon={<Wallet className="h-4 w-4" />} tone="emerald" delta={revenueDelta} />
         <StatCard index={1} label="Pending" value={formatMoney(kpis.pendingRevenue)} icon={<Clock className="h-4 w-4" />} tone="amber" />
-        <StatCard index={2} label="Avg. consultation" value={formatMoney(avgFee)} icon={<TrendingUp className="h-4 w-4" />} tone="sky" delta={4} />
-        <StatCard index={3} label="No-show rate" value={`${kpis.noShowRate}%`} icon={<Percent className="h-4 w-4" />} tone="rose" delta={-2} />
+        <StatCard index={2} label="Avg. consultation" value={formatMoney(avgFee)} icon={<TrendingUp className="h-4 w-4" />} tone="sky" />
+        <StatCard index={3} label="No-show rate" value={`${kpis.noShowRate}%`} icon={<Percent className="h-4 w-4" />} tone="rose" delta={noShowDelta} goodWhenNegative />
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">

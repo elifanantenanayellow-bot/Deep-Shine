@@ -11,6 +11,7 @@ import {
   topDoctors,
   patientGrowth,
   isSameDay,
+  monthDelta,
 } from "@/demo/selectors";
 import { PageTitle, DashboardSkeleton } from "@/components/demo/portal-shell";
 import { StatCard } from "@/components/demo/stat-card";
@@ -35,6 +36,12 @@ export default function ClinicDashboard() {
       byStatus: appointmentsByStatus(data.appointments),
       leaders: topDoctors(data, data.appointments, 5),
       growth: patientGrowth(data.patients, now),
+      deltas: {
+        appointments: monthDelta(data.appointments, now, "appointments"),
+        revenue: monthDelta(data.appointments, now, "revenue"),
+        patients: monthDelta(data.appointments, now, "patients"),
+        noShows: monthDelta(data.appointments, now, "noShows"),
+      },
     };
   }, [data]);
 
@@ -47,10 +54,10 @@ export default function ClinicDashboard() {
       <PageTitle title="Clinic overview" subtitle="Clinique Sourire · Antananarivo" />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard index={0} label="Appointments today" value={String(stats.today)} icon={<CalendarCheck className="h-4 w-4" />} tone="primary" delta={9} />
-        <StatCard index={1} label="Revenue (paid)" value={formatMoney(kpis.paidRevenue)} icon={<Wallet className="h-4 w-4" />} tone="emerald" delta={16} />
-        <StatCard index={2} label="Active patients" value={String(kpis.patients)} icon={<Users className="h-4 w-4" />} tone="sky" delta={7} />
-        <StatCard index={3} label="No-show rate" value={`${kpis.noShowRate}%`} icon={<Percent className="h-4 w-4" />} tone="rose" delta={-4} />
+        <StatCard index={0} label="Appointments today" value={String(stats.today)} icon={<CalendarCheck className="h-4 w-4" />} tone="primary" delta={stats.deltas.appointments} />
+        <StatCard index={1} label="Revenue (paid)" value={formatMoney(kpis.paidRevenue)} icon={<Wallet className="h-4 w-4" />} tone="emerald" delta={stats.deltas.revenue} />
+        <StatCard index={2} label="Active patients" value={String(kpis.patients)} icon={<Users className="h-4 w-4" />} tone="sky" delta={stats.deltas.patients} />
+        <StatCard index={3} label="No-show rate" value={`${kpis.noShowRate}%`} icon={<Percent className="h-4 w-4" />} tone="rose" delta={stats.deltas.noShows} goodWhenNegative />
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">

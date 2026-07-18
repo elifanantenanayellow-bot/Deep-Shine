@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { Download, Wallet, Clock, CalendarCheck, Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { useDemo } from "@/demo/store";
-import { computeKpis, dailySeries, revenueByMethod, topDoctors, clinicName } from "@/demo/selectors";
+import { computeKpis, dailySeries, revenueByMethod, topDoctors, clinicName, monthDelta } from "@/demo/selectors";
 import { PageTitle, DashboardSkeleton } from "@/components/demo/portal-shell";
 import { StatCard } from "@/components/demo/stat-card";
 import { AreaTrend, BarsChart, DonutChart, ChartLegend } from "@/components/demo/charts";
@@ -31,6 +31,8 @@ export default function ClinicRevenue() {
       byMethod: revenueByMethod(data.appointments),
       leaders: topDoctors(data, data.appointments, 6),
       byClinic,
+      revenueDelta: monthDelta(data.appointments, now, "revenue"),
+      apptDelta: monthDelta(data.appointments, now, "appointments"),
     };
   }, [data]);
 
@@ -51,10 +53,10 @@ export default function ClinicRevenue() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard index={0} label="Revenue (paid)" value={formatMoney(kpis.paidRevenue)} icon={<Wallet className="h-4 w-4" />} tone="emerald" delta={16} />
+        <StatCard index={0} label="Revenue (paid)" value={formatMoney(kpis.paidRevenue)} icon={<Wallet className="h-4 w-4" />} tone="emerald" delta={model.revenueDelta} />
         <StatCard index={1} label="Pending payments" value={formatMoney(kpis.pendingRevenue)} icon={<Clock className="h-4 w-4" />} tone="amber" />
-        <StatCard index={2} label="Total appointments" value={String(kpis.totalAppointments)} icon={<CalendarCheck className="h-4 w-4" />} tone="primary" delta={11} />
-        <StatCard index={3} label="Occupancy" value={`${kpis.occupancy}%`} icon={<Building2 className="h-4 w-4" />} tone="sky" delta={6} />
+        <StatCard index={2} label="Total appointments" value={String(kpis.totalAppointments)} icon={<CalendarCheck className="h-4 w-4" />} tone="primary" delta={model.apptDelta} />
+        <StatCard index={3} label="Occupancy" value={`${kpis.occupancy}%`} icon={<Building2 className="h-4 w-4" />} tone="sky" />
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">

@@ -149,6 +149,43 @@ export function topDoctors(data: DemoData, appts: Appointment[], limit = 5) {
   return [...map.values()].sort((a, b) => b.revenue - a.revenue).slice(0, limit);
 }
 
+// % change of a metric between the last 30 days and the 30 days before that.
+// Seed data spans -60 days, so both windows are populated.
+export function monthDelta(
+  appts: Appointment[],
+  now: Date,
+  metric: "appointments" | "revenue" | "noShows" | "patients",
+): number {
+  const windowValue = (from: Date, to: Date): number => {
+    const inWindow = appts.filter((a) => {
+      const s = new Date(a.start);
+      return s >= from && s < to;
+    });
+    switch (metric) {
+      case "appointments":
+        return inWindow.length;
+      case "revenue":
+        return inWindow
+          .filter((a) => a.paymentStatus === "paid")
+          .reduce((s, a) => s + a.fee, 0);
+      case "noShows":
+        return inWindow.filter((a) => a.status === "no_show").length;
+      case "patients":
+        return new Set(inWindow.map((a) => a.patientId)).size;
+    }
+  };
+
+  const mid = new Date(now);
+  mid.setDate(mid.getDate() - 30);
+  const startPrev = new Date(now);
+  startPrev.setDate(startPrev.getDate() - 60);
+
+  const current = windowValue(mid, now);
+  const previous = windowValue(startPrev, mid);
+  if (previous === 0) return current > 0 ? 100 : 0;
+  return Math.round(((current - previous) / previous) * 100);
+}
+
 // Bookable 30-min slots for a doctor on a given day: 08:00–17:00, lunch 12–13,
 // minus slots already taken by non-cancelled appointments for that doctor.
 export function availableSlots(
