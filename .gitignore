@@ -18,6 +18,10 @@ next-env.d.ts
 # prisma
 /prisma/dev.db
 
+# playwright
+/test-results/
+/playwright-report/
+
 # misc
 .DS_Store
 *.pem
