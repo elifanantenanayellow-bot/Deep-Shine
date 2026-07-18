@@ -10,7 +10,8 @@ import {
   useState,
 } from "react";
 import { toast } from "sonner";
-import { generateDemoData, PAYMENT_METHODS } from "./data";
+import { generateDemoData, PAYMENT_METHODS, DEMO_CLINIC_ID } from "./data";
+import { availableSlots } from "./selectors";
 import type {
   Appointment,
   DemoData,
@@ -82,6 +83,9 @@ interface DemoContextValue {
     entry: { reason: string; startsAt: string; endsAt: string },
   ) => void;
   removeDoctorTimeOff: (doctorId: string, timeOffId: string) => void;
+  // Books a real free slot for a random flagship doctor — used by the
+  // clinic dashboard to simulate online bookings arriving live.
+  simulateIncomingBooking: () => void;
   pushNotification: (n: Omit<NotificationItem, "id" | "createdAt" | "read">) => void;
   markAllRead: () => void;
   resetDemo: () => void;
@@ -358,6 +362,63 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
     }));
   }, []);
 
+  const simulateIncomingBooking = useCallback(() => {
+    setData((d) => {
+      const doctors = d.doctors.filter((x) => x.clinicId === DEMO_CLINIC_ID);
+      if (doctors.length === 0 || d.patients.length === 0) return d;
+      const doctor = doctors[Math.floor(Math.random() * doctors.length)];
+      const patient = d.patients[Math.floor(Math.random() * d.patients.length)];
+
+      // Find a genuinely free slot in the next 7 days using the real engine.
+      let slotIso: string | null = null;
+      for (let offset = 0; offset < 7 && !slotIso; offset++) {
+        const day = new Date();
+        day.setHours(0, 0, 0, 0);
+        day.setDate(day.getDate() + offset);
+        const free = availableSlots(d, doctor.id, day).filter((s) => !s.taken);
+        if (free.length > 0) {
+          slotIso = free[Math.floor(Math.random() * free.length)].iso;
+        }
+      }
+      if (!slotIso) return d;
+
+      const when = new Date(slotIso);
+      const appt: Appointment = {
+        id: nextId("ap"),
+        patientId: patient.id,
+        doctorId: doctor.id,
+        clinicId: doctor.clinicId,
+        specialtyId: doctor.specialtyId,
+        start: slotIso,
+        durationMin: 30,
+        status: "upcoming",
+        reason: "Online booking",
+        fee: doctor.consultationFee,
+        paymentMethod: Math.random() > 0.5 ? "MVola" : "Orange Money",
+        paymentStatus: "paid",
+        createdAt: new Date().toISOString(),
+      };
+      toast.info(
+        `New online booking — ${patient.name} with ${doctor.name}, ${when.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric" })} ${when.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`,
+      );
+      return {
+        ...d,
+        appointments: [appt, ...d.appointments],
+        notifications: [
+          {
+            id: nextId("nt"),
+            kind: "confirmed" as const,
+            title: "New online booking",
+            body: `${patient.name} booked with ${doctor.name}.`,
+            createdAt: new Date().toISOString(),
+            read: false,
+          },
+          ...d.notifications,
+        ],
+      };
+    });
+  }, []);
+
   const resetDemo = useCallback(() => {
     const fresh = generateDemoData(new Date());
     setData(fresh);
@@ -418,6 +479,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       updateDoctorDay,
       addDoctorTimeOff,
       removeDoctorTimeOff,
+      simulateIncomingBooking,
       pushNotification,
       markAllRead,
       resetDemo,
@@ -437,6 +499,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       updateDoctorDay,
       addDoctorTimeOff,
       removeDoctorTimeOff,
+      simulateIncomingBooking,
       pushNotification,
       markAllRead,
       resetDemo,

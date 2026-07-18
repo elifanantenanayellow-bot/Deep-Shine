@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import Link from "next/link";
 import { CalendarCheck, Wallet, Users, Percent, TrendingUp } from "lucide-react";
 import { useDemo } from "@/demo/store";
@@ -25,7 +25,22 @@ import { formatMoney } from "@/lib/utils";
 const STATUS_COLORS = ["#10b981", "#6366f1", "#f43f5e", "#f59e0b"];
 
 export default function ClinicDashboard() {
-  const { ready, data } = useDemo();
+  const { ready, data, simulateIncomingBooking } = useDemo();
+
+  // Simulated live activity: an online booking arrives shortly after the
+  // dashboard opens, then every ~35s while it stays visible.
+  useEffect(() => {
+    if (!ready) return;
+    const fire = () => {
+      if (!document.hidden) simulateIncomingBooking();
+    };
+    const first = setTimeout(fire, 8000);
+    const interval = setInterval(fire, 35000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(interval);
+    };
+  }, [ready, simulateIncomingBooking]);
 
   const stats = useMemo(() => {
     const now = new Date();
