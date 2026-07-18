@@ -49,7 +49,7 @@ export default function DoctorDashboard() {
         <StatCard index={3} label="Completed visits" value={String(completed)} icon={<TrendingUp className="h-4 w-4" />} tone="violet" />
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-3">
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
         <FadeIn className="lg:col-span-2">
           <Card className="p-5">
             <div className="mb-4 flex items-center justify-between">

@@ -56,7 +56,7 @@ export default function DoctorAvailability() {
         action={<Button onClick={() => toast.success("Availability saved")}>Save changes</Button>}
       />
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <FadeIn className="lg:col-span-2">
           <Card className="p-5">
             <h2 className="mb-4 font-semibold">Weekly working hours</h2>
@@ -111,8 +111,8 @@ export default function DoctorAvailability() {
             <div className="mt-4 space-y-2 border-t border-border pt-4">
               <Input placeholder="Reason (e.g. vacation)" value={reason} onChange={(e) => setReason(e.target.value)} />
               <div className="flex gap-2">
-                <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-                <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+                <Input type="date" className="min-w-0" value={from} onChange={(e) => setFrom(e.target.value)} />
+                <Input type="date" className="min-w-0" value={to} onChange={(e) => setTo(e.target.value)} />
               </div>
               <Button variant="outline" className="w-full gap-2" onClick={addTimeOff}><Plus className="h-4 w-4" /> Add time off</Button>
             </div>

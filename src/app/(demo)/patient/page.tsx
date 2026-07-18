@@ -47,7 +47,7 @@ export default function PatientDashboard() {
         <StatCard index={3} label="Doctors seen" value={String(new Set(mine.map((a) => a.doctorId)).size)} icon={<Stethoscope className="h-4 w-4" />} tone="sky" />
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-3">
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
         <FadeIn className="lg:col-span-2">
           <Card>
             <div className="flex items-center justify-between border-b border-border px-5 py-4">

@@ -25,7 +25,7 @@ export default function PatientSettings() {
     <>
       <PageTitle title="Settings" subtitle="Manage your profile and notification preferences." />
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <FadeIn className="lg:col-span-2">
           <Card className="p-6">
             <div className="flex items-center gap-2 border-b border-border pb-4">

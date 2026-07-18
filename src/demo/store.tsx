@@ -101,7 +101,10 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
     }
   }, [data, ready]);
 
-  const nextId = (prefix: string) => `${prefix}-${idRef.current++}`;
+  // Time-based prefix keeps ids unique across page reloads (the counter alone
+  // would reset and collide with entries already persisted in localStorage).
+  const nextId = (prefix: string) =>
+    `${prefix}-${Date.now().toString(36)}${(idRef.current++).toString(36)}`;
 
   const pushNotification = useCallback(
     (n: Omit<NotificationItem, "id" | "createdAt" | "read">) => {
@@ -110,7 +113,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
         notifications: [
           {
             ...n,
-            id: `nt-${idRef.current++}`,
+            id: nextId("nt"),
             createdAt: new Date().toISOString(),
             read: false,
           },
@@ -202,7 +205,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       next.setDate(next.getDate() + 1);
       next.setHours(9, 0, 0, 0);
       const doctor: Doctor = {
-        id: `dr-${idRef.current++}`,
+        id: nextId("dr"),
         name: input.name.startsWith("Dr.") ? input.name : `Dr. ${input.name}`,
         specialtyId: input.specialtyId,
         clinicId: input.clinicId,

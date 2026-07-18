@@ -59,7 +59,7 @@ export default function ClinicRevenue() {
         <StatCard index={3} label="Occupancy" value={`${kpis.occupancy}%`} icon={<Building2 className="h-4 w-4" />} tone="sky" />
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-3">
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
         <FadeIn className="lg:col-span-2">
           <Card className="p-5">
             <h2 className="mb-4 font-semibold">Revenue trend · 30 days</h2>
@@ -75,7 +75,7 @@ export default function ClinicRevenue() {
         </FadeIn>
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
         <FadeIn>
           <Card className="p-5">
             <h2 className="mb-4 font-semibold">Revenue by clinic</h2>

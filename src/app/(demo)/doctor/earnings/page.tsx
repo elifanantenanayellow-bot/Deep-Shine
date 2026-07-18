@@ -40,7 +40,7 @@ export default function DoctorEarnings() {
         <StatCard index={3} label="No-show rate" value={`${kpis.noShowRate}%`} icon={<Percent className="h-4 w-4" />} tone="rose" delta={noShowDelta} goodWhenNegative />
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-3">
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
         <FadeIn className="lg:col-span-2">
           <Card className="p-5">
             <h2 className="mb-4 font-semibold">Revenue · last 30 days</h2>

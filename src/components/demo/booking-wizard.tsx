@@ -45,7 +45,6 @@ export function BookingWizard({
   const [slotIso, setSlotIso] = useState<string | null>(null);
   const [reason, setReason] = useState("Consultation générale");
   const [payOpen, setPayOpen] = useState(false);
-  const [bookedId, setBookedId] = useState<string | null>(null);
 
   const days = useMemo(() => next14Days(), []);
   const doctorsInSpecialty = useMemo(
@@ -63,7 +62,6 @@ export function BookingWizard({
     setDoctor(presetDoctor ?? null);
     setDay(null);
     setSlotIso(null);
-    setBookedId(null);
   }
 
   function close() {
@@ -73,7 +71,7 @@ export function BookingWizard({
 
   function confirmPayment(method: PaymentMethod, status: PaymentStatus) {
     if (!doctor || !slotIso) return;
-    const appt = book({
+    book({
       patientId: currentPatientId,
       doctorId: doctor.id,
       start: slotIso,
@@ -83,7 +81,6 @@ export function BookingWizard({
       paymentMethod: method,
       paymentStatus: status,
     });
-    setBookedId(appt.id);
     setPayOpen(false);
     setStep("done");
   }
@@ -279,9 +276,6 @@ export function BookingWizard({
         onClose={() => setPayOpen(false)}
         onComplete={confirmPayment}
       />
-
-      {/* keep referenced to avoid unused warning when booked */}
-      <span className="hidden">{bookedId}</span>
     </>
   );
 }

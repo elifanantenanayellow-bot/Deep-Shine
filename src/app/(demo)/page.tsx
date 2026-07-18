@@ -157,7 +157,7 @@ function Hero() {
 function PortalStrip() {
   return (
     <section className="mx-auto -mt-8 max-w-6xl px-4">
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {portals.map((p, i) => (
           <FadeIn key={p.href} delay={i * 0.08}>
             <Link href={p.href}>
@@ -216,7 +216,7 @@ function Pricing() {
           <h2 className="text-3xl font-semibold sm:text-4xl">Simple pricing that scales</h2>
           <p className="mx-auto mt-3 max-w-2xl text-muted-foreground">Monthly in Ariary. No setup fees. Cancel anytime.</p>
         </FadeIn>
-        <div className="mt-14 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-14 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
           {plans.map((p, i) => (
             <FadeIn key={p.name} delay={i * 0.06}>
               <div className={cn("flex h-full flex-col rounded-2xl border bg-card p-6 shadow-sm", p.featured ? "border-primary ring-2 ring-primary/20" : "border-border")}>
@@ -251,7 +251,7 @@ function Testimonials() {
       <FadeIn className="text-center">
         <h2 className="text-3xl font-semibold sm:text-4xl">Loved by clinics across the island</h2>
       </FadeIn>
-      <div className="mt-14 grid gap-6 md:grid-cols-3">
+      <div className="mt-14 grid grid-cols-1 gap-6 md:grid-cols-3">
         {testimonials.map((t, i) => (
           <FadeIn key={t.name} delay={i * 0.08}>
             <div className="h-full rounded-xl border border-border bg-card p-6 shadow-sm">

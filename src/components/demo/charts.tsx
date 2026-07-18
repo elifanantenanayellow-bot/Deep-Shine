@@ -5,6 +5,7 @@ import {
   AreaChart,
   Bar,
   BarChart,
+  CartesianGrid,
   Cell,
   Pie,
   PieChart,
@@ -76,6 +77,7 @@ export function AreaTrend({
     <div style={{ width: "100%", height }}>
       <ResponsiveContainer>
         <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <CartesianGrid vertical={false} stroke="hsl(var(--border))" strokeOpacity={0.6} />
           <defs>
             <linearGradient id={`grad-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor={color} stopOpacity={0.35} />
@@ -116,6 +118,7 @@ export function BarsChart({
     <div style={{ width: "100%", height }}>
       <ResponsiveContainer>
         <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <CartesianGrid vertical={false} stroke="hsl(var(--border))" strokeOpacity={0.6} />
           <XAxis dataKey="label" {...axisProps} minTickGap={12} />
           <YAxis {...axisProps} width={money ? 48 : 28} tickFormatter={(v) => (money ? `${Math.round(v / 1000)}k` : `${v}`)} />
           <Tooltip content={<TooltipBox money={money} />} cursor={{ fill: "hsl(var(--muted))" }} />

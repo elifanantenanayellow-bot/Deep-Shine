@@ -29,7 +29,7 @@ export default function ClinicSettings() {
     <>
       <PageTitle title="Settings" subtitle="Clinic profile, billing and payment methods." />
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <FadeIn>
           <Card className="p-6">
             <div className="flex items-center gap-2 border-b border-border pb-4">

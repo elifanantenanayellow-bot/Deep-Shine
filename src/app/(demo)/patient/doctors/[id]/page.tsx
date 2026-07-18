@@ -51,7 +51,7 @@ export default function DoctorProfile({ params }: { params: Promise<{ id: string
         <ChevronLeft className="h-4 w-4" /> All doctors
       </Link>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <FadeIn className="lg:col-span-2">
           <Card className="p-6">
             <div className="flex flex-wrap items-start gap-4">
