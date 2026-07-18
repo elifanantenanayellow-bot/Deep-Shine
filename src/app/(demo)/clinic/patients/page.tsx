@@ -5,6 +5,7 @@ import { Search, Download } from "lucide-react";
 import { toast } from "sonner";
 import { useDemo } from "@/demo/store";
 import { DEMO_CLINIC_ID } from "@/demo/data";
+import { downloadCsv } from "@/demo/csv";
 import { PageTitle, DashboardSkeleton } from "@/components/demo/portal-shell";
 import { Avatar, EmptyState } from "@/components/demo/primitives";
 import { FadeIn } from "@/components/demo/motion";
@@ -47,7 +48,30 @@ export default function ClinicPatients() {
       <PageTitle
         title="Patients"
         subtitle={`${enriched.length} patients seen at Clinique Sourire`}
-        action={<Button variant="outline" className="gap-2" onClick={() => toast.success("Exported patients.csv (demo)")}><Download className="h-4 w-4" /> Export</Button>}
+        action={
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => {
+              downloadCsv(
+                "patients-clinique-sourire.csv",
+                ["Name", "Email", "Phone", "City", "Visits", "Total paid (MGA)", "Last visit"],
+                enriched.map(({ p, v }) => [
+                  p.name,
+                  p.email,
+                  p.phone,
+                  p.city,
+                  v.count,
+                  v.spent,
+                  new Date(v.last).toISOString().slice(0, 10),
+                ]),
+              );
+              toast.success(`Exported ${enriched.length} patients`);
+            }}
+          >
+            <Download className="h-4 w-4" /> Export CSV
+          </Button>
+        }
       />
 
       <Card className="mb-4 p-3">

@@ -5,7 +5,8 @@ import { Download, Wallet, Clock, CalendarCheck, CheckCircle2 } from "lucide-rea
 import { toast } from "sonner";
 import { useDemo } from "@/demo/store";
 import { DEMO_CLINIC_ID } from "@/demo/data";
-import { computeKpis, dailySeries, revenueByMethod, topDoctors, specialtyName, monthDelta } from "@/demo/selectors";
+import { downloadCsv } from "@/demo/csv";
+import { computeKpis, dailySeries, revenueByMethod, topDoctors, specialtyName, doctorName, patientName, monthDelta } from "@/demo/selectors";
 import { PageTitle, DashboardSkeleton } from "@/components/demo/portal-shell";
 import { StatCard } from "@/components/demo/stat-card";
 import { AreaTrend, BarsChart, DonutChart, ChartLegend } from "@/components/demo/charts";
@@ -50,10 +51,33 @@ export default function ClinicRevenue() {
         title="Revenue & reports"
         subtitle="Financial performance across the clinic group."
         action={
-          <div className="flex gap-2">
-            <Button variant="outline" className="gap-2" onClick={() => toast.success("Exported revenue.csv (demo)")}><Download className="h-4 w-4" /> CSV</Button>
-            <Button variant="outline" className="gap-2" onClick={() => toast.success("Generated report.pdf (demo)")}><Download className="h-4 w-4" /> PDF</Button>
-          </div>
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => {
+              const rows = data.appointments
+                .filter((a) => a.clinicId === DEMO_CLINIC_ID)
+                .sort((a, b) => +new Date(a.start) - +new Date(b.start))
+                .map((a) => [
+                  new Date(a.start).toISOString().slice(0, 10),
+                  new Date(a.start).toISOString().slice(11, 16),
+                  patientName(data, a.patientId),
+                  doctorName(data, a.doctorId),
+                  specialtyName(data, a.specialtyId),
+                  a.status,
+                  a.paymentStatus,
+                  a.fee,
+                ]);
+              downloadCsv(
+                "revenue-clinique-sourire.csv",
+                ["Date", "Time", "Patient", "Doctor", "Specialty", "Status", "Payment", "Fee (MGA)"],
+                rows,
+              );
+              toast.success(`Exported ${rows.length} appointments`);
+            }}
+          >
+            <Download className="h-4 w-4" /> Export CSV
+          </Button>
         }
       />
 
