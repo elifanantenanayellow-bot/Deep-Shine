@@ -68,6 +68,25 @@ export interface Appointment {
   createdAt: string; // ISO
 }
 
+export interface WeeklyHours {
+  enabled: boolean;
+  startMin: number; // minutes from midnight
+  endMin: number;
+}
+
+export interface TimeOffEntry {
+  id: string;
+  reason: string;
+  startsAt: string; // ISO
+  endsAt: string; // ISO
+}
+
+export interface DoctorSchedule {
+  doctorId: string;
+  weekly: WeeklyHours[]; // index 0 = Sunday … 6 = Saturday
+  timeOff: TimeOffEntry[];
+}
+
 export interface NotificationItem {
   id: string;
   kind: "reminder" | "confirmed" | "cancelled" | "new_patient" | "payment";
@@ -83,5 +102,6 @@ export interface DemoData {
   doctors: Doctor[];
   patients: Patient[];
   appointments: Appointment[];
+  schedules: DoctorSchedule[];
   notifications: NotificationItem[];
 }

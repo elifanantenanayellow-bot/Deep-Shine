@@ -18,9 +18,12 @@ import type {
   NotificationItem,
   PaymentMethod,
   PaymentStatus,
+  WeeklyHours,
 } from "./types";
 
-const STORAGE_KEY = "deepshine-demo-v1";
+// Bump the suffix whenever DemoData's shape changes — older persisted
+// payloads are ignored and the demo reseeds instead of crashing.
+const STORAGE_KEY = "deepshine-demo-v2";
 
 interface BookInput {
   patientId: string;
@@ -51,6 +54,16 @@ interface DemoContextValue {
     clinicId: string;
     consultationFee: number;
   }) => void;
+  updateDoctorDay: (
+    doctorId: string,
+    weekday: number,
+    patch: Partial<WeeklyHours>,
+  ) => void;
+  addDoctorTimeOff: (
+    doctorId: string,
+    entry: { reason: string; startsAt: string; endsAt: string },
+  ) => void;
+  removeDoctorTimeOff: (doctorId: string, timeOffId: string) => void;
   pushNotification: (n: Omit<NotificationItem, "id" | "createdAt" | "read">) => void;
   markAllRead: () => void;
   resetDemo: () => void;
@@ -66,6 +79,7 @@ const EMPTY: DemoData = {
   doctors: [],
   patients: [],
   appointments: [],
+  schedules: [],
   notifications: [],
 };
 
@@ -220,7 +234,21 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
         phone: "+261 34 00 000 00",
         nextAvailable: next.toISOString(),
       };
-      setData((d) => ({ ...d, doctors: [doctor, ...d.doctors] }));
+      // Every doctor needs a schedule or they'd be unbookable: Mon–Sat 08–17.
+      const schedule = {
+        doctorId: doctor.id,
+        weekly: Array.from({ length: 7 }, (_, weekday) => ({
+          enabled: weekday !== 0,
+          startMin: 8 * 60,
+          endMin: 17 * 60,
+        })),
+        timeOff: [],
+      };
+      setData((d) => ({
+        ...d,
+        doctors: [doctor, ...d.doctors],
+        schedules: [...d.schedules, schedule],
+      }));
       pushNotification({
         kind: "new_patient",
         title: "Doctor added",
@@ -230,6 +258,53 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
     },
     [pushNotification],
   );
+
+  const updateDoctorDay = useCallback<DemoContextValue["updateDoctorDay"]>(
+    (doctorId, weekday, patch) => {
+      setData((d) => ({
+        ...d,
+        schedules: d.schedules.map((s) =>
+          s.doctorId === doctorId
+            ? {
+                ...s,
+                weekly: s.weekly.map((w, i) =>
+                  i === weekday ? { ...w, ...patch } : w,
+                ),
+              }
+            : s,
+        ),
+      }));
+    },
+    [],
+  );
+
+  const addDoctorTimeOff = useCallback<DemoContextValue["addDoctorTimeOff"]>(
+    (doctorId, entry) => {
+      setData((d) => ({
+        ...d,
+        schedules: d.schedules.map((s) =>
+          s.doctorId === doctorId
+            ? { ...s, timeOff: [{ id: nextId("to"), ...entry }, ...s.timeOff] }
+            : s,
+        ),
+      }));
+      toast.success("Time off added — those slots are now unbookable");
+    },
+    [],
+  );
+
+  const removeDoctorTimeOff = useCallback<
+    DemoContextValue["removeDoctorTimeOff"]
+  >((doctorId, timeOffId) => {
+    setData((d) => ({
+      ...d,
+      schedules: d.schedules.map((s) =>
+        s.doctorId === doctorId
+          ? { ...s, timeOff: s.timeOff.filter((t) => t.id !== timeOffId) }
+          : s,
+      ),
+    }));
+  }, []);
 
   const markAllRead = useCallback(() => {
     setData((d) => ({
@@ -271,6 +346,9 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       rescheduleAppointment,
       markStatus,
       addDoctor,
+      updateDoctorDay,
+      addDoctorTimeOff,
+      removeDoctorTimeOff,
       pushNotification,
       markAllRead,
       resetDemo,
@@ -286,6 +364,9 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       rescheduleAppointment,
       markStatus,
       addDoctor,
+      updateDoctorDay,
+      addDoctorTimeOff,
+      removeDoctorTimeOff,
       pushNotification,
       markAllRead,
       resetDemo,

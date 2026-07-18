@@ -147,8 +147,8 @@ function RescheduleModal({ appointment, onClose }: { appointment: Appointment | 
   }, []);
 
   const slots = useMemo(
-    () => (appointment && day ? availableSlots(data.appointments, appointment.doctorId, day) : []),
-    [data.appointments, appointment, day],
+    () => (appointment && day ? availableSlots(data, appointment.doctorId, day) : []),
+    [data, appointment, day],
   );
 
   return (

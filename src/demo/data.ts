@@ -7,6 +7,7 @@ import type {
   Clinic,
   DemoData,
   Doctor,
+  DoctorSchedule,
   NotificationItem,
   Patient,
   PaymentMethod,
@@ -177,6 +178,33 @@ export function generateDemoData(now: Date): DemoData {
     }
   }
 
+  // Schedules — kept coherent with the appointment generator above
+  // (appointments are seeded Mon–Sat between 08:00 and 17:00, none Sunday).
+  // A couple of doctors get a vacation placed beyond the +21d appointment
+  // window so seeded bookings never contradict their time off.
+  const schedules: DoctorSchedule[] = doctors.map((d, i) => {
+    const weekly = Array.from({ length: 7 }, (_, weekday) => ({
+      enabled: weekday !== 0, // closed Sunday
+      startMin: 8 * 60,
+      endMin: 17 * 60,
+    }));
+    const timeOff = [];
+    if (i === 2 || i === 7) {
+      const from = new Date(now);
+      from.setDate(from.getDate() + 25);
+      from.setHours(0, 0, 0, 0);
+      const to = new Date(from);
+      to.setDate(to.getDate() + 5);
+      timeOff.push({
+        id: `to-seed-${i}`,
+        reason: "Congé annuel",
+        startsAt: from.toISOString(),
+        endsAt: to.toISOString(),
+      });
+    }
+    return { doctorId: d.id, weekly, timeOff };
+  });
+
   // Notifications for the demo bell
   const notifications: NotificationItem[] = [
     {
@@ -213,7 +241,7 @@ export function generateDemoData(now: Date): DemoData {
     },
   ];
 
-  return { specialties: SPECIALTIES, clinics: CLINICS, doctors, patients, appointments, notifications };
+  return { specialties: SPECIALTIES, clinics: CLINICS, doctors, patients, appointments, schedules, notifications };
 }
 
 export const SPECIALTY_LIST = SPECIALTIES;

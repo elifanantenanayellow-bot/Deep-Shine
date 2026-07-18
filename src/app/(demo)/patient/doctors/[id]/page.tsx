@@ -30,8 +30,8 @@ export default function DoctorProfile({ params }: { params: Promise<{ id: string
     return d;
   }, []);
   const slots = useMemo(
-    () => (doctor ? availableSlots(data.appointments, doctor.id, previewDay) : []),
-    [data.appointments, doctor, previewDay],
+    () => (doctor ? availableSlots(data, doctor.id, previewDay) : []),
+    [data, doctor, previewDay],
   );
 
   if (!ready) return <DashboardSkeleton />;
@@ -101,6 +101,11 @@ export default function DoctorProfile({ params }: { params: Promise<{ id: string
             <p className="mt-1 text-xs text-muted-foreground">
               {previewDay.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}
             </p>
+            {slots.length === 0 && (
+              <p className="mt-4 rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
+                Not working today — use the booking button to see other days.
+              </p>
+            )}
             <div className="mt-4 grid grid-cols-3 gap-2">
               {slots.slice(0, 12).map((s) => (
                 <button

@@ -52,8 +52,8 @@ export function BookingWizard({
     [data.doctors, specialtyId],
   );
   const slots = useMemo(
-    () => (doctor && day ? availableSlots(data.appointments, doctor.id, day) : []),
-    [data.appointments, doctor, day],
+    () => (doctor && day ? availableSlots(data, doctor.id, day) : []),
+    [data, doctor, day],
   );
 
   function reset() {
@@ -205,9 +205,13 @@ export function BookingWizard({
                     </button>
                   ))}
                 </div>
-                {slots.every((s) => s.taken) && (
+                {slots.length === 0 ? (
+                  <p className="mt-3 text-center text-sm text-muted-foreground">
+                    {doctor.name.split(" ").slice(0, 2).join(" ")} isn&apos;t working this day — try another date.
+                  </p>
+                ) : slots.every((s) => s.taken) ? (
                   <p className="mt-3 text-center text-sm text-muted-foreground">Fully booked — try another day.</p>
-                )}
+                ) : null}
               </StepWrap>
             )}
 

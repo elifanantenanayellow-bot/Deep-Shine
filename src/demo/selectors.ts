@@ -186,15 +186,21 @@ export function monthDelta(
   return Math.round(((current - previous) / previous) * 100);
 }
 
-// Bookable 30-min slots for a doctor on a given day: 08:00–17:00, lunch 12–13,
-// minus slots already taken by non-cancelled appointments for that doctor.
+// Bookable 30-min slots for a doctor on a given day, derived from the
+// doctor's actual weekly schedule and time-off (lunch 12:00–13:00 fixed),
+// minus slots already taken by non-cancelled appointments. A disabled day
+// or a day fully covered by time off yields an empty array.
 export function availableSlots(
-  appts: Appointment[],
+  data: DemoData,
   doctorId: string,
   day: Date,
 ): { time: string; iso: string; taken: boolean }[] {
+  const schedule = data.schedules.find((s) => s.doctorId === doctorId);
+  const weekly = schedule?.weekly[day.getDay()];
+  if (!schedule || !weekly?.enabled) return [];
+
   const taken = new Set(
-    appts
+    data.appointments
       .filter(
         (a) =>
           a.doctorId === doctorId &&
@@ -207,19 +213,27 @@ export function availableSlots(
       }),
   );
 
+  const offRanges = schedule.timeOff.map((t) => ({
+    start: new Date(t.startsAt).getTime(),
+    end: new Date(t.endsAt).getTime(),
+  }));
+
   const slots: { time: string; iso: string; taken: boolean }[] = [];
   const now = Date.now();
-  for (let h = 8; h < 17; h++) {
+  for (let min = weekly.startMin; min + 30 <= weekly.endMin; min += 30) {
+    const h = Math.floor(min / 60);
+    const m = min % 60;
     if (h === 12) continue; // lunch break
-    for (const m of [0, 30]) {
-      const d = new Date(day);
-      d.setHours(h, m, 0, 0);
-      slots.push({
-        time: `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`,
-        iso: d.toISOString(),
-        taken: taken.has(`${h}:${m}`) || d.getTime() < now,
-      });
-    }
+    const d = new Date(day);
+    d.setHours(h, m, 0, 0);
+    const t = d.getTime();
+    const inTimeOff = offRanges.some((r) => t >= r.start && t < r.end);
+    if (inTimeOff) continue; // blocked entirely, not just "taken"
+    slots.push({
+      time: `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`,
+      iso: d.toISOString(),
+      taken: taken.has(`${h}:${m}`) || t < now,
+    });
   }
   return slots;
 }
