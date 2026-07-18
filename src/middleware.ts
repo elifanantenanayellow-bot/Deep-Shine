@@ -6,8 +6,34 @@ const SESSION_COOKIE = "ds_session";
 // Routes that require an authenticated session.
 const PROTECTED = ["/app", "/admin"];
 
+// The database-backed surface (production foundation). Without a configured
+// DATABASE_URL these pages would crash on interaction, so in demo mode
+// (no database) they are redirected to the interactive demo instead.
+const DB_BACKED = [
+  "/login",
+  "/register",
+  "/onboarding",
+  "/app",
+  "/admin",
+  "/book",
+  "/api/auth",
+  "/api/public",
+  "/api/reports",
+];
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  const demoMode = !process.env.DATABASE_URL;
+  if (
+    demoMode &&
+    DB_BACKED.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+  ) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
 
   // Expose the current path to server components (for active-nav highlighting).
   const requestHeaders = new Headers(req.headers);

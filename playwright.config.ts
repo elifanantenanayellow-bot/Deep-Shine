@@ -38,6 +38,10 @@ export default defineConfig({
       JWT_SECRET:
         process.env.JWT_SECRET ??
         "e2e-only-secret-value-thirty-two-characters-min",
+      // Force demo mode so the legacy-route gate is deterministic in tests
+      // (an empty value is still "set" for Next's env loading, but falsy for
+      // the middleware's check).
+      DATABASE_URL: "",
     },
   },
 });
