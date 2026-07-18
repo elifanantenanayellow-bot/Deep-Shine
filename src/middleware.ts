@@ -30,7 +30,9 @@ export async function middleware(req: NextRequest) {
     DB_BACKED.some((p) => pathname === p || pathname.startsWith(`${p}/`))
   ) {
     const url = req.nextUrl.clone();
-    url.pathname = "/";
+    // Auth intents get the demo's role picker; everything else the landing.
+    url.pathname =
+      pathname === "/login" || pathname === "/register" ? "/signin" : "/";
     url.search = "";
     return NextResponse.redirect(url);
   }

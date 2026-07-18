@@ -3,23 +3,28 @@ import { test, expect } from "@playwright/test";
 // In demo mode (no DATABASE_URL — forced by playwright.config webServer env)
 // the database-backed surface must redirect to the demo landing instead of
 // rendering pages whose actions would crash without Postgres.
-const LEGACY_ROUTES = [
-  "/login",
-  "/register",
-  "/onboarding",
-  "/app",
-  "/app/calendar",
-  "/admin",
-  "/book/sourire",
+// Auth intents land on the demo role picker; the rest on the landing page.
+const LEGACY_ROUTES: [string, string][] = [
+  ["/login", "/signin"],
+  ["/register", "/signin"],
+  ["/onboarding", "/"],
+  ["/app", "/"],
+  ["/app/calendar", "/"],
+  ["/admin", "/"],
+  ["/book/sourire", "/"],
 ];
 
-for (const route of LEGACY_ROUTES) {
-  test(`demo mode redirects ${route} to /`, async ({ page }) => {
+for (const [route, target] of LEGACY_ROUTES) {
+  test(`demo mode redirects ${route} to ${target}`, async ({ page }) => {
     await page.goto(route);
-    await expect(page).toHaveURL("/");
-    await expect(
-      page.getByRole("heading", { name: /booking platform/i }),
-    ).toBeVisible();
+    await expect(page).toHaveURL(target);
+    if (target === "/") {
+      await expect(
+        page.getByRole("heading", { name: /booking platform/i }),
+      ).toBeVisible();
+    } else {
+      await expect(page.getByText("Explore the demo")).toBeVisible();
+    }
   });
 }
 

@@ -87,8 +87,8 @@ function Header() {
           <a href="#faq" className="hover:text-foreground">FAQ</a>
         </nav>
         <div className="flex items-center gap-2">
-          <Link href="/patient"><Button variant="ghost" size="sm">Sign in</Button></Link>
-          <Link href="/patient"><Button size="sm">Explore demo</Button></Link>
+          <Link href="/signin"><Button variant="ghost" size="sm">Sign in</Button></Link>
+          <Link href="/signin"><Button size="sm">Explore demo</Button></Link>
         </div>
       </div>
     </header>

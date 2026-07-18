@@ -60,6 +60,7 @@ interface DemoContextValue {
   currentPatientId: string;
   currentDoctorId: string;
   setCurrentPatientId: (id: string) => void;
+  setCurrentDoctorId: (id: string) => void;
   // mutations
   book: (input: BookInput) => Appointment;
   cancelAppointment: (id: string) => void;
@@ -105,7 +106,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   const [presenterMode, setPresenterMode] = useState(false);
   const [currentPatientId, setCurrentPatientId] = useState("pt-1");
-  const currentDoctorId = "dr-1";
+  const [currentDoctorId, setCurrentDoctorId] = useState("dr-1");
   const idRef = useRef(100000);
 
   // Initialize client-side only (no SSR/hydration drift, gives a loading beat).
@@ -408,6 +409,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       currentPatientId,
       currentDoctorId,
       setCurrentPatientId,
+      setCurrentDoctorId,
       book,
       cancelAppointment,
       rescheduleAppointment,
