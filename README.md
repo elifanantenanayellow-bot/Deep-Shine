@@ -1,15 +1,41 @@
 # Deep-Shine
 
-Multi-tenant SaaS platform for appointment booking — built first for **dentists,
-doctors and medical clinics**, architected to expand to salons, barbers,
-lawyers, tutors, restaurants and beyond.
+A modern appointment-booking platform for clinics and doctors in Madagascar —
+delivered as a **fully interactive demo** you can explore end-to-end in the
+browser, plus a database-backed SaaS foundation for the production build.
 
-This is a **B2B SaaS** (not a marketplace): the platform owner runs one system;
-each business subscribes and gets a private, isolated workspace. No clinic can
-access another clinic's data.
+## 🎬 Interactive demo — start here
 
-> Full product spec, architecture, DB design, roadmap and security strategy live
-> in [`/docs`](./docs).
+No database, no auth server, no configuration. Everything runs on realistic
+fake data (20 doctors, 50 patients, 10 specialties, 6 clinics, hundreds of
+appointments) held in memory and persisted to `localStorage`.
+
+```bash
+npm install
+npm run dev
+# open http://localhost:3000
+```
+
+| Where            | What you can do                                                            |
+|------------------|-----------------------------------------------------------------------------|
+| `/` Landing      | Hero, features, pricing, testimonials, FAQ, CTA — animated                  |
+| `/patient`       | Dashboard, search & filter doctors, profiles, live availability, **book → pay (MVola/Orange/Airtel/Card simulated) → confirmation**, cancel, reschedule, settings, persona switching |
+| `/doctor`        | Today's schedule (mark completed/no-show), weekly calendar, patient list, earnings + analytics charts, availability & time-off management |
+| `/clinic`        | KPI dashboard with charts, doctors management (add doctors), patients, appointment management, revenue & reports, settings |
+
+Booking instantly updates every calendar and dashboard; cancelling updates the
+statistics; payments simulate success / pending / failure; notifications appear
+as toasts and in the bell menu. Use **Reset demo data** in any sidebar to start
+fresh.
+
+---
+
+## Production foundation (optional)
+
+The repo also contains the multi-tenant, PostgreSQL-backed SaaS foundation
+(under `/app`, `/admin`, `/book/[slug]` and `/api`) with JWT auth, RBAC and a
+real availability engine. It is not required for the demo. Full product spec,
+architecture, DB design, roadmap and security strategy live in [`/docs`](./docs).
 
 ## Stack
 

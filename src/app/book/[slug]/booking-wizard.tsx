@@ -131,7 +131,7 @@ export function BookingWizard({
           })}
         </p>
         <p className="mt-4 text-xs text-muted-foreground">
-          The clinic will confirm your booking shortly. You'll receive reminders before your visit.
+          The clinic will confirm your booking shortly. You&apos;ll receive reminders before your visit.
         </p>
       </Card>
     );

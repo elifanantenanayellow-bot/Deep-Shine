@@ -15,8 +15,8 @@ export default async function OnboardingPage() {
       <Card className="w-full max-w-md p-8 text-center animate-fade-in">
         <h1 className="text-2xl font-semibold">Hi {user.name.split(" ")[0]} 👋</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Your account isn't attached to a clinic workspace yet. Patients can book
-          directly on a clinic's public page — ask your clinic for their link, or
+          Your account isn&apos;t attached to a clinic workspace yet. Patients can book
+          directly on a clinic&apos;s public page — ask your clinic for their link, or
           create a clinic workspace to manage bookings.
         </p>
         <div className="mt-6 space-y-2">

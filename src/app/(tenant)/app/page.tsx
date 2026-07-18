@@ -25,7 +25,7 @@ export default async function DashboardPage() {
     <>
       <PageHeader
         title={`Welcome back`}
-        description={`Here's what's happening at ${organization.name} today.`}
+        description={`Here is what's happening at ${organization.name} today.`}
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -46,7 +46,7 @@ export default async function DashboardPage() {
 
       <Card className="mt-6">
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
-          <h2 className="font-semibold">Today's schedule</h2>
+          <h2 className="font-semibold">Today&apos;s schedule</h2>
           <Badge tone="primary">{today.length} appointments</Badge>
         </div>
         {today.length === 0 ? (

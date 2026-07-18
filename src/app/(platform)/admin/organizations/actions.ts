@@ -35,7 +35,7 @@ export async function createOrganization(
   });
   if (existing) return { error: "A user with that email already exists" };
 
-  let base = slugify(data.name) || "clinic";
+  const base = slugify(data.name) || "clinic";
   let slug = base;
   let n = 1;
   while (await prisma.organization.findUnique({ where: { slug } })) {

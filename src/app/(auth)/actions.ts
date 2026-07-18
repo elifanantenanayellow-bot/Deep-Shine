@@ -88,7 +88,7 @@ export async function registerAction(
 
   if (data.accountType === "clinic") {
     // Ensure a unique slug.
-    let base = slugify(data.organizationName!) || "clinic";
+    const base = slugify(data.organizationName!) || "clinic";
     let slug = base;
     let n = 1;
     while (await prisma.organization.findUnique({ where: { slug } })) {
