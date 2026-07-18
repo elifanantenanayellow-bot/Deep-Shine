@@ -264,9 +264,6 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
 
   const addDoctor = useCallback<DemoContextValue["addDoctor"]>(
     (input) => {
-      const next = new Date();
-      next.setDate(next.getDate() + 1);
-      next.setHours(9, 0, 0, 0);
       const doctor: Doctor = {
         id: nextId("dr"),
         name: input.name.startsWith("Dr.") ? input.name : `Dr. ${input.name}`,
@@ -281,7 +278,6 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
         consultationFee: input.consultationFee,
         email: `${input.name.toLowerCase().replace(/[^a-z]+/g, ".")}@deepshine.mg`,
         phone: "+261 34 00 000 00",
-        nextAvailable: next.toISOString(),
       };
       // Every doctor needs a schedule or they'd be unbookable: Mon–Sat 08–17.
       const schedule = {

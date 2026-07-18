@@ -4,13 +4,23 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Search } from "lucide-react";
 import { useDemo } from "@/demo/store";
-import { specialtyName, clinicName } from "@/demo/selectors";
+import { specialtyName, clinicName, nextFreeSlot } from "@/demo/selectors";
 import { PageTitle, DashboardSkeleton } from "@/components/demo/portal-shell";
 import { Avatar, RatingStars, EmptyState } from "@/components/demo/primitives";
 import { SpecialtyIcon } from "@/components/demo/specialty-icon";
 import { Stagger, StaggerItem } from "@/components/demo/motion";
 import { Card, Input, Button } from "@/components/ui";
 import { cn, formatMoney } from "@/lib/utils";
+
+function NextSlotLine({ doctorId }: { doctorId: string }) {
+  const { data } = useDemo();
+  const next = useMemo(() => nextFreeSlot(data, doctorId), [data, doctorId]);
+  return (
+    <p className="mt-1.5 text-xs font-medium text-emerald-600">
+      {next ? `Next: ${next.label}` : "No availability this week"}
+    </p>
+  );
+}
 
 export default function DoctorsPage() {
   const { ready, data } = useDemo();
@@ -102,6 +112,7 @@ export default function DoctorsPage() {
                     <RatingStars value={d.rating} count={d.reviews} />
                     <span className="text-xs text-muted-foreground">{d.experienceYears} yrs</span>
                   </div>
+                  <NextSlotLine doctorId={d.id} />
                   <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{d.bio}</p>
                   <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
                     <span className="text-sm font-semibold">{formatMoney(d.consultationFee)}</span>

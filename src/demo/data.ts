@@ -76,21 +76,25 @@ function slugEmail(name: string, domain: string, i: number): string {
 export function generateDemoData(now: Date): DemoData {
   const rng = mulberry32(20260717);
 
-  // Doctors
+  // Doctors — names drawn from a small pool, so retry until unique (two
+  // doctors sharing a name reads as a bug in every roster and table).
   const doctors: Doctor[] = [];
+  const usedNames = new Set<string>();
   for (let i = 0; i < 20; i++) {
     const gender = rng() > 0.45 ? "F" : "M";
-    const first = gender === "F" ? pick(rng, FIRST_F) : pick(rng, FIRST_M);
-    const last = pick(rng, LAST);
+    let first = gender === "F" ? pick(rng, FIRST_F) : pick(rng, FIRST_M);
+    let last = pick(rng, LAST);
+    let guard = 0;
+    while (usedNames.has(`${first} ${last}`) && guard++ < 30) {
+      first = gender === "F" ? pick(rng, FIRST_F) : pick(rng, FIRST_M);
+      last = pick(rng, LAST);
+    }
+    usedNames.add(`${first} ${last}`);
     const name = `${pick(rng, DOCTOR_TITLES)} ${first} ${last}`;
     const specialty = SPECIALTIES[i % SPECIALTIES.length];
     // Clinique Sourire (cl-1) is the flagship demo clinic: 8 of 20 doctors
     // work there (including dr-1) so its scoped portal looks busy.
     const clinic = i < 8 ? CLINICS[0] : pick(rng, CLINICS.slice(1));
-    const nextDays = Math.floor(rng() * 5);
-    const nextAvail = new Date(now);
-    nextAvail.setDate(nextAvail.getDate() + nextDays);
-    nextAvail.setHours(8 + Math.floor(rng() * 8), rng() > 0.5 ? 30 : 0, 0, 0);
     doctors.push({
       id: `dr-${i + 1}`,
       name,
@@ -105,7 +109,6 @@ export function generateDemoData(now: Date): DemoData {
       consultationFee: round(30000 + rng() * 120000, 5000),
       email: slugEmail(`${first} ${last}`, "deepshine.mg", i),
       phone: phone(rng),
-      nextAvailable: nextAvail.toISOString(),
     });
   }
 

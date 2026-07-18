@@ -238,6 +238,31 @@ export function availableSlots(
   return slots;
 }
 
+// First genuinely free slot for a doctor within the next 7 days, with a
+// human label ("today 14:30", "tomorrow 09:00", "lun. 09:00"), or null.
+export function nextFreeSlot(
+  data: DemoData,
+  doctorId: string,
+): { iso: string; label: string } | null {
+  for (let offset = 0; offset < 7; offset++) {
+    const day = new Date();
+    day.setHours(0, 0, 0, 0);
+    day.setDate(day.getDate() + offset);
+    const free = availableSlots(data, doctorId, day).filter((s) => !s.taken);
+    if (free.length > 0) {
+      const time = free[0].time;
+      const label =
+        offset === 0
+          ? `today ${time}`
+          : offset === 1
+            ? `tomorrow ${time}`
+            : `${day.toLocaleDateString("fr-FR", { weekday: "short" })} ${time}`;
+      return { iso: free[0].iso, label };
+    }
+  }
+  return null;
+}
+
 export function revenueByMethod(appts: Appointment[]) {
   const methods = ["MVola", "Orange Money", "Airtel Money", "Credit Card"] as const;
   return methods.map((m) => ({

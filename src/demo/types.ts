@@ -37,7 +37,6 @@ export interface Doctor {
   consultationFee: number; // MGA
   email: string;
   phone: string;
-  nextAvailable: string; // ISO
 }
 
 export interface Patient {
