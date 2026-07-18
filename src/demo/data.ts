@@ -229,13 +229,20 @@ export function generateDemoData(now: Date): DemoData {
     return { doctorId: d.id, weekly, timeOff };
   });
 
-  // Notifications for the demo bell
+  // Notifications for the demo bell — built from the dataset itself so
+  // every referenced doctor, patient, amount and time actually exists.
+  const upcomingRef = appointments.find(
+    (a) => a.status === "upcoming" && a.clinicId === "cl-1",
+  );
+  const refDoctor = doctors.find((x) => x.id === upcomingRef?.doctorId) ?? doctors[0];
+  const refWhen = upcomingRef ? new Date(upcomingRef.start) : now;
+  const refFee = upcomingRef?.fee ?? doctors[0].consultationFee;
   const notifications: NotificationItem[] = [
     {
       id: "nt-1",
       kind: "reminder",
       title: "Appointment reminder",
-      body: "You have an appointment tomorrow at 09:30 with Dr. Fara Rakoto.",
+      body: `You have an appointment ${refWhen.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })} at ${refWhen.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} with ${refDoctor.name}.`,
       createdAt: new Date(now.getTime() - 1000 * 60 * 30).toISOString(),
       read: false,
     },
@@ -243,7 +250,7 @@ export function generateDemoData(now: Date): DemoData {
       id: "nt-2",
       kind: "confirmed",
       title: "Booking confirmed",
-      body: "Your booking for a General Medicine consultation is confirmed.",
+      body: `Your booking with ${doctors[1].name} is confirmed.`,
       createdAt: new Date(now.getTime() - 1000 * 60 * 60 * 3).toISOString(),
       read: false,
     },
@@ -251,7 +258,7 @@ export function generateDemoData(now: Date): DemoData {
       id: "nt-3",
       kind: "payment",
       title: "Payment received",
-      body: "MVola payment of 45 000 MGA received successfully.",
+      body: `MVola payment of ${new Intl.NumberFormat("fr-FR").format(refFee)} MGA received successfully.`,
       createdAt: new Date(now.getTime() - 1000 * 60 * 60 * 26).toISOString(),
       read: true,
     },
@@ -259,7 +266,7 @@ export function generateDemoData(now: Date): DemoData {
       id: "nt-4",
       kind: "new_patient",
       title: "New patient registered",
-      body: "Hanta Randria just created an account at Clinique Sourire.",
+      body: `${patients[3].name} just created an account at ${CLINICS[0].name}.`,
       createdAt: new Date(now.getTime() - 1000 * 60 * 60 * 50).toISOString(),
       read: true,
     },
