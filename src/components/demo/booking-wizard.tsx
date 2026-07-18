@@ -60,6 +60,7 @@ export function BookingWizard({
   );
   const [reason, setReason] = useState("Consultation générale");
   const [payOpen, setPayOpen] = useState(false);
+  const [lastPaymentStatus, setLastPaymentStatus] = useState<PaymentStatus | null>(null);
 
   const days = useMemo(() => next14Days(), []);
   const doctorsInSpecialty = useMemo(
@@ -103,6 +104,7 @@ export function BookingWizard({
       paymentMethod: method,
       paymentStatus: status,
     });
+    setLastPaymentStatus(status);
     setPayOpen(false);
     setStep("done");
   }
@@ -285,6 +287,11 @@ export function BookingWizard({
                     {doctor.name} ·{" "}
                     {new Date(slotIso).toLocaleString("fr-FR", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}
                   </p>
+                  {lastPaymentStatus === "pending" && (
+                    <p className="mt-2 rounded-md bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-600">
+                      Payment pending — you can pay at the clinic before your visit.
+                    </p>
+                  )}
                   <p className="mt-2 text-xs text-muted-foreground">
                     It now appears in your dashboard and the clinic calendar. A reminder is scheduled.
                   </p>

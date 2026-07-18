@@ -160,7 +160,8 @@ export function PaymentModal({
                   </div>
                   <p className="mt-4 text-lg font-semibold">Payment failed</p>
                   <p className="mt-1 max-w-xs text-center text-sm text-muted-foreground">
-                    The {method} transaction didn&apos;t go through. Try another method.
+                    The {method} transaction didn&apos;t go through. Try another
+                    method — or book now and simply pay at the clinic.
                   </p>
                 </>
               )}
@@ -171,8 +172,16 @@ export function PaymentModal({
                     <Button variant="outline" className="flex-1" onClick={reset}>
                       Try again
                     </Button>
-                    <Button className="flex-1" onClick={finish}>
-                      Continue anyway
+                    <Button
+                      className="flex-1"
+                      onClick={() => {
+                        // Booking proceeds unpaid: payment is collected at
+                        // the clinic, so the appointment carries "pending".
+                        onComplete(method, "pending");
+                        reset();
+                      }}
+                    >
+                      Book &amp; pay at clinic
                     </Button>
                   </>
                 ) : (
