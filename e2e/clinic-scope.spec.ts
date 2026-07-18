@@ -18,6 +18,8 @@ test("clinic portal is scoped to its own clinic", async ({ page }) => {
   await waitForHydration(page);
   await expect(page.getByText("Revenue by doctor")).toBeVisible();
   await expect(page.getByText("Revenue by clinic")).toHaveCount(0);
+  // Stat tiles use compact money so large figures never wrap.
+  await expect(page.getByText(/\d+(,\d+)? (M|k) MGA/).first()).toBeVisible();
 
   // Data-level check: every appointment in the store rendered by the clinic
   // list belongs to cl-1 (compare against the persisted demo store).

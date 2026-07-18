@@ -15,6 +15,18 @@ export function formatMoney(cents: number, currency = "MGA"): string {
   return `${formatted} ${currency}`;
 }
 
+// Compact form for stat tiles where full figures wrap: 32,8 M MGA / 450 k MGA.
+export function formatMoneyCompact(cents: number, currency = "MGA"): string {
+  const major = currency === "MGA" ? cents : cents / 100;
+  if (Math.abs(major) >= 1_000_000) {
+    return `${(major / 1_000_000).toFixed(1).replace(".", ",").replace(",0", "")} M ${currency}`;
+  }
+  if (Math.abs(major) >= 10_000) {
+    return `${Math.round(major / 1000)} k ${currency}`;
+  }
+  return formatMoney(cents, currency);
+}
+
 export function slugify(input: string): string {
   return input
     .toLowerCase()

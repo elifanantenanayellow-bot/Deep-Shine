@@ -12,7 +12,7 @@ import { AreaTrend, BarsChart, DonutChart, ChartLegend } from "@/components/demo
 import { Avatar } from "@/components/demo/primitives";
 import { FadeIn } from "@/components/demo/motion";
 import { Button, Card } from "@/components/ui";
-import { formatMoney } from "@/lib/utils";
+import { formatMoney, formatMoneyCompact } from "@/lib/utils";
 
 export default function ClinicRevenue() {
   const { ready, data } = useDemo();
@@ -58,8 +58,8 @@ export default function ClinicRevenue() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard index={0} label="Revenue (paid)" value={formatMoney(kpis.paidRevenue)} icon={<Wallet className="h-4 w-4" />} tone="emerald" delta={model.revenueDelta} />
-        <StatCard index={1} label="Pending payments" value={formatMoney(kpis.pendingRevenue)} icon={<Clock className="h-4 w-4" />} tone="amber" />
+        <StatCard index={0} label="Revenue (paid)" value={formatMoneyCompact(kpis.paidRevenue)} icon={<Wallet className="h-4 w-4" />} tone="emerald" delta={model.revenueDelta} />
+        <StatCard index={1} label="Pending payments" value={formatMoneyCompact(kpis.pendingRevenue)} icon={<Clock className="h-4 w-4" />} tone="amber" />
         <StatCard index={2} label="Total appointments" value={String(kpis.totalAppointments)} icon={<CalendarCheck className="h-4 w-4" />} tone="primary" delta={model.apptDelta} />
         <StatCard index={3} label="Completion rate" value={`${model.completionRate}%`} icon={<CheckCircle2 className="h-4 w-4" />} tone="sky" />
       </div>

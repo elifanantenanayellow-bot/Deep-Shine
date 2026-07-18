@@ -9,7 +9,7 @@ import { StatCard } from "@/components/demo/stat-card";
 import { AreaTrend, DonutChart, ChartLegend, CHART_COLORS } from "@/components/demo/charts";
 import { FadeIn } from "@/components/demo/motion";
 import { Card } from "@/components/ui";
-import { formatMoney } from "@/lib/utils";
+import { formatMoney, formatMoneyCompact } from "@/lib/utils";
 
 export default function DoctorEarnings() {
   const { ready, data, currentDoctorId } = useDemo();
@@ -34,9 +34,9 @@ export default function DoctorEarnings() {
       <PageTitle title="Earnings & analytics" subtitle="Your revenue performance over time." />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard index={0} label="Total earned" value={formatMoney(kpis.paidRevenue)} icon={<Wallet className="h-4 w-4" />} tone="emerald" delta={revenueDelta} />
-        <StatCard index={1} label="Pending" value={formatMoney(kpis.pendingRevenue)} icon={<Clock className="h-4 w-4" />} tone="amber" />
-        <StatCard index={2} label="Avg. consultation" value={formatMoney(avgFee)} icon={<TrendingUp className="h-4 w-4" />} tone="sky" />
+        <StatCard index={0} label="Total earned" value={formatMoneyCompact(kpis.paidRevenue)} icon={<Wallet className="h-4 w-4" />} tone="emerald" delta={revenueDelta} />
+        <StatCard index={1} label="Pending" value={formatMoneyCompact(kpis.pendingRevenue)} icon={<Clock className="h-4 w-4" />} tone="amber" />
+        <StatCard index={2} label="Avg. consultation" value={formatMoneyCompact(avgFee)} icon={<TrendingUp className="h-4 w-4" />} tone="sky" />
         <StatCard index={3} label="No-show rate" value={`${kpis.noShowRate}%`} icon={<Percent className="h-4 w-4" />} tone="rose" delta={noShowDelta} goodWhenNegative />
       </div>
 

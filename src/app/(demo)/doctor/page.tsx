@@ -11,7 +11,7 @@ import { Avatar, StatusPill, EmptyState } from "@/components/demo/primitives";
 import { AreaTrend } from "@/components/demo/charts";
 import { FadeIn } from "@/components/demo/motion";
 import { Button, Card } from "@/components/ui";
-import { formatMoney } from "@/lib/utils";
+import { formatMoneyCompact } from "@/lib/utils";
 
 export default function DoctorDashboard() {
   const { ready, data, currentDoctorId, markStatus } = useDemo();
@@ -45,7 +45,7 @@ export default function DoctorDashboard() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard index={0} label="Today's appointments" value={String(today.length)} icon={<CalendarClock className="h-4 w-4" />} tone="primary" delta={deltas.appointments} />
         <StatCard index={1} label="Total patients" value={String(uniquePatients)} icon={<Users className="h-4 w-4" />} tone="sky" delta={deltas.patients} />
-        <StatCard index={2} label="Earnings (paid)" value={formatMoney(earnings)} icon={<Wallet className="h-4 w-4" />} tone="emerald" delta={deltas.revenue} />
+        <StatCard index={2} label="Earnings (paid)" value={formatMoneyCompact(earnings)} icon={<Wallet className="h-4 w-4" />} tone="emerald" delta={deltas.revenue} />
         <StatCard index={3} label="Completed visits" value={String(completed)} icon={<TrendingUp className="h-4 w-4" />} tone="violet" />
       </div>
 

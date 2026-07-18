@@ -11,7 +11,7 @@ import { Avatar, StatusPill, PaymentPill, EmptyState } from "@/components/demo/p
 import { BookingWizard } from "@/components/demo/booking-wizard";
 import { FadeIn } from "@/components/demo/motion";
 import { Button, Card } from "@/components/ui";
-import { formatMoney } from "@/lib/utils";
+import { formatMoney, formatMoneyCompact } from "@/lib/utils";
 
 export default function PatientDashboard() {
   const { ready, data, currentPatientId } = useDemo();
@@ -43,7 +43,7 @@ export default function PatientDashboard() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard index={0} label="Upcoming" value={String(upcoming.length)} icon={<CalendarClock className="h-4 w-4" />} tone="primary" />
         <StatCard index={1} label="Completed visits" value={String(completed.length)} icon={<CheckCircle2 className="h-4 w-4" />} tone="emerald" />
-        <StatCard index={2} label="Total spent" value={formatMoney(spent)} icon={<CreditCard className="h-4 w-4" />} tone="violet" />
+        <StatCard index={2} label="Total spent" value={formatMoneyCompact(spent)} icon={<CreditCard className="h-4 w-4" />} tone="violet" />
         <StatCard index={3} label="Doctors seen" value={String(new Set(mine.map((a) => a.doctorId)).size)} icon={<Stethoscope className="h-4 w-4" />} tone="sky" />
       </div>
 

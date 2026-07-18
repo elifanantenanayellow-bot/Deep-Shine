@@ -20,7 +20,7 @@ import { AreaTrend, BarsChart, DonutChart, ChartLegend } from "@/components/demo
 import { Avatar } from "@/components/demo/primitives";
 import { FadeIn } from "@/components/demo/motion";
 import { Card } from "@/components/ui";
-import { formatMoney } from "@/lib/utils";
+import { formatMoney, formatMoneyCompact } from "@/lib/utils";
 
 const STATUS_COLORS = ["#10b981", "#6366f1", "#f43f5e", "#f59e0b"];
 
@@ -75,7 +75,7 @@ export default function ClinicDashboard() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard index={0} label="Appointments today" value={String(stats.today)} icon={<CalendarCheck className="h-4 w-4" />} tone="primary" delta={stats.deltas.appointments} />
-        <StatCard index={1} label="Revenue (paid)" value={formatMoney(kpis.paidRevenue)} icon={<Wallet className="h-4 w-4" />} tone="emerald" delta={stats.deltas.revenue} />
+        <StatCard index={1} label="Revenue (paid)" value={formatMoneyCompact(kpis.paidRevenue)} icon={<Wallet className="h-4 w-4" />} tone="emerald" delta={stats.deltas.revenue} />
         <StatCard index={2} label="Active patients" value={String(kpis.patients)} icon={<Users className="h-4 w-4" />} tone="sky" delta={stats.deltas.patients} />
         <StatCard index={3} label="No-show rate" value={`${kpis.noShowRate}%`} icon={<Percent className="h-4 w-4" />} tone="rose" delta={stats.deltas.noShows} goodWhenNegative />
       </div>
