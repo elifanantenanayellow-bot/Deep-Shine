@@ -248,6 +248,35 @@ Pulled forward only by real customer demand.
 
 ---
 
+## 2b. Business lens per milestone
+
+We are building a business, not just software. Every milestone is evaluated on
+both axes; if customer feedback or business priorities change the calculus,
+**reorder the plan and say so** — the plan serves the business, not the
+reverse.
+
+| M | Business value | Customer value | Risk ↓ | Debt ↓ | Unlocks revenue? | Unlocks real usage? | Postponable before pilot? |
+|---|---|---|---|---|---|---|---|
+| **M0** | Credible infrastructure story for diligence; unblocks every later demo-to-prospect on a real URL | None direct (invisible plumbing) | Catastrophic-loss risk (no backups, unversioned schema) | Removes `db push` debt | No | No — but nothing works without it | **No** — everything depends on it |
+| **M1** | Diligence-grade correctness proof; protects the brand from the one unforgivable bug (double-booking) | Indirect: bookings that never collide | F1 (critical), isolation regressions | Converts "verified once manually" into executable spec | No | No | **No** — F1 fix and isolation suite are non-negotiable; *coverage breadth* beyond them could be trimmed 20% under pressure |
+| **M2** | Support-cost avoidance (password resets are the #1 ticket); security posture for clinic trust | Self-serve account recovery; safe accounts | Credential stuffing; F2 wrong-tenant writes | Removes auth skeleton debt | No | Partially — real users need reset | **Mostly no**; TOTP already deferred; email *verification* (not reset) could slip to post-pilot if the pilot is hand-onboarded |
+| **M3** | The product finally looks like what we sell; demo-to-contract continuity | The good UX on their real data; French; correct times | Timezone corruption of real schedules | Retires dual-UI debt + timezone naivety | No | **Yes** — this is the usable product | **No** for pilot quality; *scope* can flex (port the clinic workspace first, admin extras later) |
+| **M4** | The headline ROI claim (fewer no-shows) becomes true; unit cost feeds pricing | Patients get reminded; clinics see fewer empty chairs | Pricing built on unknown SMS cost | None | Indirectly — it's *why* clinics will pay | **Yes** — the feature that changes clinic behavior | **No** — a booking tool without reminders is a paper-diary competitor |
+| **M5** | Sales scalability (onboarding without engineers); legal exposure closed | Clinic self-setup in an afternoon; data portability | Compliance (Law 2014-038); support drowning | None | No | **Yes** — first non-assisted clinic | Wizard partially yes (hand-onboard pilot #1); **privacy/consent: no** |
+| **M6** | The defensible wedge (mobile-money) becomes real; deposit-taking clinics are stickier | Patients pay from their phone; clinics get prepayment | Revenue-model risk if rails never land | None | **Yes** (indirect: enables paid plans' promise) | Deepens usage | **Yes** — by design, Gate A excludes it |
+| **M7** | Revenue collection exists; plan limits become real | Transparent billing, trials | "Revenue is a spreadsheet" risk | None | **Yes** — directly | No | **Yes** for pilot (it's free) |
+| **M8** | Churn protection via reliability; scales support | Uptime, fast recovery | Outage blindness; booking races under load | Operational debt | No | No | **Yes** — first pass can follow the pilot by weeks |
+| **M9** | Expansion features on demand-pull | Varies per item | Low | Varies | Some items (Stripe) | Some items | **Yes — all of it, by definition** |
+
+**Standing reorder triggers** (evaluate at every gate):
+- Pilot clinics value reminders over UI polish → pull M4's scheduler ahead of
+  M3's long tail (the wizard port must still precede public patient use).
+- MVola approval lands early → pull the M6 integration spike forward into any
+  idle externally-blocked week.
+- Pilot #1 agrees to hand-onboarding → defer M5's wizard, never its
+  privacy/consent items.
+- M1 uncovers defects beyond F1–F3 → stop, re-estimate M3, re-baseline gates.
+
 ## 3. Risk register
 
 | # | Risk | Likelihood | Impact | Mitigation |
