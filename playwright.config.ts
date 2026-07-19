@@ -17,31 +17,60 @@ function resolveChromium(): string | undefined {
 
 const executablePath = resolveChromium();
 
+const JWT_SECRET =
+  process.env.JWT_SECRET ?? "e2e-only-secret-value-thirty-two-characters-min";
+
+// Database used by the foundation (DB-backed) test server and its specs.
+export const FOUNDATION_DB_URL =
+  process.env.E2E_DATABASE_URL ??
+  "postgresql://postgres:postgres@localhost:5432/deepshine_deploy?schema=public";
+
 export default defineConfig({
-  testDir: "./e2e",
   timeout: 60_000,
   fullyParallel: false,
   retries: process.env.CI ? 1 : 0,
   reporter: [["list"]],
   use: {
-    baseURL: "http://localhost:3000",
     trace: "retain-on-failure",
     ...devices["Desktop Chrome"],
     launchOptions: executablePath ? { executablePath } : {},
   },
-  webServer: {
-    command: "npm run start",
-    url: "http://localhost:3000",
-    reuseExistingServer: !process.env.CI,
-    timeout: 60_000,
-    env: {
-      JWT_SECRET:
-        process.env.JWT_SECRET ??
-        "e2e-only-secret-value-thirty-two-characters-min",
-      // Force demo mode so the legacy-route gate is deterministic in tests
-      // (an empty value is still "set" for Next's env loading, but falsy for
-      // the middleware's check).
-      DATABASE_URL: "",
+  projects: [
+    {
+      // The zero-config demo, exactly as a fresh clone runs it.
+      name: "demo",
+      testDir: "./e2e",
+      use: { baseURL: "http://localhost:3000" },
     },
-  },
+    {
+      // The database-backed foundation (concurrency, isolation, auth).
+      name: "foundation",
+      testDir: "./e2e-foundation",
+      use: { baseURL: "http://localhost:3003" },
+    },
+  ],
+  webServer: [
+    {
+      command: "npm run start",
+      url: "http://localhost:3000",
+      reuseExistingServer: !process.env.CI,
+      timeout: 60_000,
+      env: {
+        JWT_SECRET,
+        // Force demo mode: empty is "set" for Next's env loading (so a local
+        // .env can't leak a database in), but falsy for the middleware gate.
+        DATABASE_URL: "",
+      },
+    },
+    {
+      command: "npx next start -p 3003",
+      url: "http://localhost:3003/api/health",
+      reuseExistingServer: !process.env.CI,
+      timeout: 60_000,
+      env: {
+        JWT_SECRET,
+        DATABASE_URL: FOUNDATION_DB_URL,
+      },
+    },
+  ],
 });

@@ -13,8 +13,21 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: deepshine_e2e
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       JWT_SECRET: ci-only-secret-value-thirty-two-characters-min
+      E2E_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/deepshine_e2e
     steps:
       - uses: actions/checkout@v4
 
@@ -44,10 +57,17 @@ jobs:
       - name: Build
         run: pnpm run build
 
+      - name: Prepare foundation test database
+        run: |
+          pnpm exec prisma migrate deploy
+          pnpm exec tsx prisma/seed.ts
+        env:
+          DATABASE_URL: ${{ env.E2E_DATABASE_URL }}
+
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: E2E tests
+      - name: E2E tests (demo + foundation)
         run: pnpm run test:e2e
 
       - name: Upload Playwright traces on failure

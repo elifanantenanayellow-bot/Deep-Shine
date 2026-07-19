@@ -58,9 +58,35 @@ combined with timezone-naive day math (already documented) the engine has
 never been tested at day boundaries. *Correction:* engine unit tests in
 **M1**; timezone rework in **M3**.
 
+**F4 — Booking API does not enforce slot validity** *(found during M1
+implementation)*: `createBooking` checks conflicts, service/practitioner
+existence and past-ness, but never validates the slot against working hours
+or time-off — a direct API call can book 03:00 on a Sunday. The availability
+endpoint only *suggests* slots; nothing enforces them at write time.
+*Correction:* M1 continuation (with the engine unit tests) — validate the
+requested slot inside the booking transaction against the practitioner's
+schedule; regression test books an out-of-hours slot and expects 422.
+
 Additional minor debt logged (not gate-blocking): slug check-then-create race
 in registration (unique-violation retry needed); JWT has no revocation list;
 seeded staging data must never contain real patient data.
+
+**F5 — Buffer conflict check was asymmetric** *(found during M1 falsification
+testing)*: the pre-M1 conflict predicate expanded only the incoming booking by
+its buffers, never existing appointments by theirs — so an adjacent booking
+after an appointment with an after-buffer slipped through in one serialization
+order. Exposed when falsification run A (constraint dropped) failed where the
+primary run had passed by ordering luck. *Corrected in M1:* the in-transaction
+check now expands both sides (identical semantics to the availability engine)
+and the adjacent-race test passes deterministically with the constraint
+removed, three consecutive runs.
+
+**F1 status (M1):** fixed and proven — serializable transaction with
+in-transaction buffer-aware re-check and retry, plus `appointment_no_overlap`
+exclusion constraint (`btree_gist`, partial over active statuses); CI fires
+20 parallel bookings at one slot and asserts exactly one success, nineteen
+409s, zero 5xx, one row; adjacent-slot buffer race and cancelled-slot
+rebooking covered.
 
 ---
 
