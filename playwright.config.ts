@@ -53,7 +53,11 @@ export default defineConfig({
     {
       command: "npm run start",
       url: "http://localhost:3000",
-      reuseExistingServer: !process.env.CI,
+      // Never reuse: a server started against an older .next serves stale
+      // chunks after a rebuild and fails tests for reasons unrelated to the
+      // code under test (observed during M1 as a spurious 20x500 race
+      // failure). Tests must exercise the artifact just built.
+      reuseExistingServer: false,
       timeout: 60_000,
       env: {
         JWT_SECRET,
@@ -65,7 +69,11 @@ export default defineConfig({
     {
       command: "npx next start -p 3003",
       url: "http://localhost:3003/api/health",
-      reuseExistingServer: !process.env.CI,
+      // Never reuse: a server started against an older .next serves stale
+      // chunks after a rebuild and fails tests for reasons unrelated to the
+      // code under test (observed during M1 as a spurious 20x500 race
+      // failure). Tests must exercise the artifact just built.
+      reuseExistingServer: false,
       timeout: 60_000,
       env: {
         JWT_SECRET,

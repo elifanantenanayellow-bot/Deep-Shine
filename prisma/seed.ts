@@ -100,6 +100,7 @@ async function main() {
     tier: keyof typeof planByTier;
     practitioners: { name: string; specialty: string; role: MembershipRole; color: string }[];
     services: { name: string; durationMin: number; priceCents: number; color: string }[];
+    patients: [string, string, string][]; // firstName, lastName, phone
   }) {
     const org = await prisma.organization.create({
       data: {
@@ -196,13 +197,12 @@ async function main() {
       practitioners.push(practitioner);
     }
 
-    // Patients
+    // Patients — distinct per clinic. Sharing identities across tenants would
+    // be unrealistic (clinics keep their own records) and, worse, it makes
+    // cross-tenant leak detection unreliable: a leaked row would be
+    // indistinguishable from a legitimate same-named local one.
     const patients = await Promise.all(
-      [
-        ["Hery", "Rakoto", "+261 34 22 222 22"],
-        ["Miora", "Rasoa", "+261 34 33 333 33"],
-        ["Naina", "Andria", "+261 34 44 444 44"],
-      ].map(([firstName, lastName, phone]) =>
+      opts.patients.map(([firstName, lastName, phone]) =>
         prisma.patient.create({
           data: { organizationId: org.id, firstName, lastName, phone },
         }),
@@ -269,6 +269,11 @@ async function main() {
       { name: "Détartrage", durationMin: 45, priceCents: 60000, color: "#22c55e" },
       { name: "Extraction", durationMin: 60, priceCents: 120000, color: "#f97316" },
     ],
+    patients: [
+      ["Hery", "Rakoto", "+261 34 22 222 22"],
+      ["Miora", "Rasoa", "+261 34 33 333 33"],
+      ["Naina", "Andria", "+261 34 44 444 44"],
+    ],
   });
 
   await buildClinic({
@@ -284,6 +289,11 @@ async function main() {
     services: [
       { name: "Consultation générale", durationMin: 30, priceCents: 40000, color: "#4f46e5" },
       { name: "Bilan de santé", durationMin: 60, priceCents: 150000, color: "#ec4899" },
+    ],
+    patients: [
+      ["Tahina", "Razafy", "+261 32 55 555 55"],
+      ["Fanja", "Ramaroson", "+261 32 66 666 66"],
+      ["Setra", "Ranaivo", "+261 32 77 777 77"],
     ],
   });
 

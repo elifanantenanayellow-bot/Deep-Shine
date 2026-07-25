@@ -58,7 +58,13 @@ export async function POST(
     });
   } catch (err) {
     if (err instanceof BookingError) {
-      return NextResponse.json({ error: err.message }, { status: 409 });
+      // CONFLICT: the slot was taken — retry with another time (409).
+      // INVALID_SLOT / INVALID_REQUEST: the request was never bookable (422).
+      const status = err.code === "CONFLICT" ? 409 : 422;
+      return NextResponse.json(
+        { error: err.message, code: err.code },
+        { status },
+      );
     }
     console.error(err);
     return NextResponse.json({ error: "Booking failed" }, { status: 500 });

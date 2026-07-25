@@ -2,7 +2,19 @@ import "server-only";
 import { Prisma, type AppointmentSource } from "@prisma/client";
 import { prisma } from "@/lib/db";
 
-export class BookingError extends Error {}
+export type BookingErrorCode =
+  | "CONFLICT" // slot is taken — retryable by choosing another time
+  | "INVALID_SLOT" // outside working hours / during time off — client bug or abuse
+  | "INVALID_REQUEST"; // unknown service/practitioner, past date
+
+export class BookingError extends Error {
+  constructor(
+    message: string,
+    public readonly code: BookingErrorCode = "CONFLICT",
+  ) {
+    super(message);
+  }
+}
 
 const SLOT_TAKEN = "This time slot is no longer available";
 const MAX_SERIALIZATION_RETRIES = 3;
@@ -75,16 +87,20 @@ export async function createBooking(params: {
   const service = await prisma.service.findFirst({
     where: { id: serviceId, organizationId, active: true },
   });
-  if (!service) throw new BookingError("Service not available");
+  if (!service) {
+    throw new BookingError("Service not available", "INVALID_REQUEST");
+  }
 
   const practitioner = await prisma.practitioner.findFirst({
     where: { id: practitionerId, organizationId, active: true },
   });
-  if (!practitioner) throw new BookingError("Practitioner not available");
+  if (!practitioner) {
+    throw new BookingError("Practitioner not available", "INVALID_REQUEST");
+  }
 
   const endsAt = new Date(startsAt.getTime() + service.durationMin * 60_000);
   if (startsAt.getTime() < Date.now()) {
-    throw new BookingError("Cannot book a time in the past");
+    throw new BookingError("Cannot book a time in the past", "INVALID_REQUEST");
   }
 
   // Buffer-aware conflict window: an appointment blocks its neighbours by the
@@ -101,6 +117,50 @@ export async function createBooking(params: {
     try {
       return await prisma.$transaction(
         async (tx) => {
+          // F4: the slot must actually be offerable — the availability
+          // endpoint only *suggests* slots, so without this a direct API call
+          // could book 03:00 on a Sunday. Semantics mirror the availability
+          // engine exactly (server-local wall clock; full IANA handling is
+          // M3's timezone work, tracked in the plan).
+          const dayStart = new Date(startsAt);
+          dayStart.setHours(0, 0, 0, 0);
+          const startMin = (startsAt.getTime() - dayStart.getTime()) / 60_000;
+          const endMin = (endsAt.getTime() - dayStart.getTime()) / 60_000;
+
+          const workingHours = await tx.workingHours.findMany({
+            where: {
+              organizationId,
+              practitionerId,
+              weekday: startsAt.getDay(),
+            },
+            select: { startMinutes: true, endMinutes: true },
+          });
+          const insideHours = workingHours.some(
+            (w) => startMin >= w.startMinutes && endMin <= w.endMinutes,
+          );
+          if (!insideHours) {
+            throw new BookingError(
+              "The practitioner is not working at that time",
+              "INVALID_SLOT",
+            );
+          }
+
+          const timeOff = await tx.timeOff.findFirst({
+            where: {
+              organizationId,
+              practitionerId,
+              startsAt: { lt: endsAt },
+              endsAt: { gt: startsAt },
+            },
+            select: { id: true },
+          });
+          if (timeOff) {
+            throw new BookingError(
+              "The practitioner is unavailable on that date",
+              "INVALID_SLOT",
+            );
+          }
+
           // Symmetric buffer conflict (F5): existing appointments block by
           // THEIR OWN service buffers too, exactly as the availability engine
           // computes free slots. Candidates are fetched with a guard band

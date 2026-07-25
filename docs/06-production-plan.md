@@ -63,13 +63,27 @@ implementation)*: `createBooking` checks conflicts, service/practitioner
 existence and past-ness, but never validates the slot against working hours
 or time-off — a direct API call can book 03:00 on a Sunday. The availability
 endpoint only *suggests* slots; nothing enforces them at write time.
-*Correction:* M1 continuation (with the engine unit tests) — validate the
-requested slot inside the booking transaction against the practitioner's
-schedule; regression test books an out-of-hours slot and expects 422.
+*Corrected in M1:* the booking transaction now validates the requested slot
+against the practitioner's working hours and time off, returning 422
+`INVALID_SLOT`; the API distinguishes 409 (slot taken — retry another time)
+from 422 (never bookable). Eight regression tests cover 03:00, the lunch gap,
+a slot that starts inside hours but ends after closing, Sunday, time off
+(blocked then released), past dates, and the happy path — plus an
+engine/validator agreement test asserting every slot the availability
+endpoint offers is actually bookable.
 
 Additional minor debt logged (not gate-blocking): slug check-then-create race
 in registration (unique-violation retry needed); JWT has no revocation list;
 seeded staging data must never contain real patient data.
+
+**F6 — Seed shared patient identities across tenants** *(found by the
+isolation suite during M1)*: both demo clinics were seeded with the same
+three patients and the same phone numbers. Not a product defect, but it made
+cross-tenant leak detection unreliable — a leaked row was indistinguishable
+from a legitimate local one, which is exactly how a real breach would hide.
+*Corrected:* each clinic seeds distinct patients, and the isolation tests no
+longer depend on seed quality (they plant a unique canary in the other tenant
+and additionally assert row-exact export counts).
 
 **F5 — Buffer conflict check was asymmetric** *(found during M1 falsification
 testing)*: the pre-M1 conflict predicate expanded only the incoming booking by
@@ -131,6 +145,15 @@ when its criteria run in CI or are demonstrated on staging — not before.
   succeeds; isolation suite green; engine ≥90% branch coverage; both suites
   (demo + foundation) required for merge.
 - **Verification:** CI; the race test is the F1 regression proof.
+
+**M1 STATUS: COMPLETE.** Foundation suite: 44 tests (race/concurrency 3,
+slot validation 8, availability engine 7, tenant isolation 16, auth/RBAC 11)
+running in CI against a Postgres service alongside the 63 demo tests — 107
+total. Delivered beyond original scope: F4, F5, F6 found and fixed; test
+harness hardened (`reuseExistingServer: false`) after a stale server produced
+a spurious 20×500 failure that could have been misread as a code regression.
+Remaining M1 item deliberately deferred: F2 (org-context fallback) ships with
+M2, where explicit org selection belongs.
 
 ### M2 — Auth hardening + fix F2 — *Effort: 1.5 wks*
 
