@@ -179,7 +179,17 @@ export function generateDemoData(now: Date): DemoData {
       if (d < 0) {
         const r = rng();
         status = r < 0.78 ? "completed" : r < 0.9 ? "cancelled" : "no_show";
-        paymentStatus = status === "completed" ? "paid" : status === "cancelled" ? (rng() > 0.5 ? "failed" : "paid") : "pending";
+        if (status === "completed") {
+          // Real clinics carry receivables: most visits are settled, some
+          // are still owed, a few failed. A billing screen that always
+          // reads "0 outstanding" is not a billing screen.
+          const pr = rng();
+          paymentStatus = pr < 0.8 ? "paid" : pr < 0.94 ? "pending" : "failed";
+        } else if (status === "cancelled") {
+          paymentStatus = rng() > 0.5 ? "failed" : "paid";
+        } else {
+          paymentStatus = "pending";
+        }
       } else {
         status = "upcoming";
         paymentStatus = rng() > 0.4 ? "paid" : "pending";
@@ -290,10 +300,13 @@ export function generateDemoData(now: Date): DemoData {
         clinicId: appt.clinicId,
         issuedAt: appt.start,
         amount: appt.fee,
+        // Unpaid invoices older than 30 days age into "overdue" — the
+        // distinction a clinic chases money on.
         status:
           appt.paymentStatus === "paid"
             ? "paid"
-            : appt.paymentStatus === "failed"
+            : appt.paymentStatus === "failed" ||
+                new Date(appt.start).getTime() < now.getTime() - 30 * 86_400_000
               ? "overdue"
               : "unpaid",
         method: appt.paymentMethod,
