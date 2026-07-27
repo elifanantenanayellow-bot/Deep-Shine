@@ -18,12 +18,15 @@ test("stale persisted demo data is reseeded on load", async ({ page }) => {
       appointments: [],
       schedules: [],
       notifications: [],
+      records: [],
+      prescriptions: [],
+      invoices: [],
     },
   };
 
   await page.addInitScript(
     ([key, value]) => localStorage.setItem(key, value),
-    ["deepshine-demo-v4", JSON.stringify(staleEnvelope)] as const,
+    ["deepshine-demo-v5", JSON.stringify(staleEnvelope)] as const,
   );
 
   await page.goto("/patient/doctors", { waitUntil: "networkidle" });
@@ -34,7 +37,7 @@ test("stale persisted demo data is reseeded on load", async ({ page }) => {
 
   // And the persisted envelope is now stamped today.
   const stamp = await page.evaluate(() => {
-    const raw = localStorage.getItem("deepshine-demo-v4");
+    const raw = localStorage.getItem("deepshine-demo-v5");
     return raw ? (JSON.parse(raw) as { seededAt: string }).seededAt : null;
   });
   expect(stamp).toBe(new Date().toISOString().slice(0, 10));

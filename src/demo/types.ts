@@ -86,6 +86,45 @@ export interface DoctorSchedule {
   timeOff: TimeOffEntry[];
 }
 
+export interface MedicalRecord {
+  id: string;
+  appointmentId: string;
+  patientId: string;
+  doctorId: string;
+  date: string; // ISO
+  diagnosis: string;
+  notes: string;
+  vitals: {
+    bloodPressure: string;
+    temperatureC: number;
+    weightKg: number;
+    pulseBpm: number;
+  };
+}
+
+export interface Prescription {
+  id: string;
+  appointmentId: string;
+  patientId: string;
+  doctorId: string;
+  date: string; // ISO
+  lines: { drug: string; dosage: string }[];
+}
+
+export type InvoiceStatus = "paid" | "unpaid" | "overdue";
+
+export interface Invoice {
+  id: string;
+  number: string;
+  appointmentId: string;
+  patientId: string;
+  clinicId: string;
+  issuedAt: string; // ISO
+  amount: number;
+  status: InvoiceStatus;
+  method: PaymentMethod | null;
+}
+
 export interface NotificationItem {
   id: string;
   kind: "reminder" | "confirmed" | "cancelled" | "new_patient" | "payment";
@@ -103,4 +142,7 @@ export interface DemoData {
   appointments: Appointment[];
   schedules: DoctorSchedule[];
   notifications: NotificationItem[];
+  records: MedicalRecord[];
+  prescriptions: Prescription[];
+  invoices: Invoice[];
 }

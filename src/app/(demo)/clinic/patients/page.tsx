@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { Search, Download } from "lucide-react";
 import { toast } from "sonner";
 import { useDemo } from "@/demo/store";
@@ -47,14 +48,14 @@ export default function ClinicPatients() {
     <>
       <PageTitle
         title="Patients"
-        subtitle={`${enriched.length} patients seen at Clinique Sourire`}
+        subtitle={`${enriched.length} patients seen at Centre Médical Antananarivo`}
         action={
           <Button
             variant="outline"
             className="gap-2"
             onClick={() => {
               downloadCsv(
-                "patients-clinique-sourire.csv",
+                "patients-centre-medical.csv",
                 ["Name", "Email", "Phone", "City", "Visits", "Total paid (MGA)", "Last visit"],
                 enriched.map(({ p, v }) => [
                   p.name,
@@ -101,13 +102,13 @@ export default function ClinicPatients() {
                 {rows.map(({ p, v }) => (
                   <tr key={p.id} className="hover:bg-muted/50">
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
+                      <Link href={`/clinic/patients/${p.id}`} className="flex items-center gap-3 hover:underline">
                         <Avatar name={p.name} hue={p.avatarHue} size={34} />
                         <div>
                           <p className="font-medium">{p.name}</p>
                           <p className="text-xs text-muted-foreground">{p.email}</p>
                         </div>
-                      </div>
+                      </Link>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{p.phone}</td>
                     <td className="px-4 py-3">{p.city}</td>

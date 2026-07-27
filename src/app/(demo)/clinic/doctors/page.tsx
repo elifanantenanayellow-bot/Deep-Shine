@@ -45,7 +45,7 @@ export default function ClinicDoctors() {
     <>
       <PageTitle
         title="Doctors"
-        subtitle={`${roster.length} practitioners at Clinique Sourire`}
+        subtitle={`${roster.length} practitioners at Centre Médical Antananarivo`}
         action={<Button className="gap-2" onClick={() => setOpen(true)}><Plus className="h-4 w-4" /> Add doctor</Button>}
       />
 
@@ -89,7 +89,7 @@ export default function ClinicDoctors() {
             </div>
             <div className="space-y-1.5">
               <Label>Clinic</Label>
-              <Input value="Clinique Sourire" disabled title="Doctors you add join your clinic" />
+              <Input value="Centre Médical Antananarivo" disabled title="Doctors you add join your clinic" />
             </div>
           </div>
           <div className="space-y-1.5">

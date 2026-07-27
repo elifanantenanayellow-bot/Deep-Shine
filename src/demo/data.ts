@@ -8,7 +8,10 @@ import type {
   DemoData,
   Doctor,
   DoctorSchedule,
+  Invoice,
+  MedicalRecord,
   NotificationItem,
+  Prescription,
   Patient,
   PaymentMethod,
   PaymentStatus,
@@ -40,7 +43,7 @@ const SPECIALTIES: Specialty[] = [
 ];
 
 const CLINICS: Clinic[] = [
-  { id: "cl-1", name: "Clinique Sourire", city: "Antananarivo", address: "Lot II M 34, Analakely", phone: "+261 34 12 345 01" },
+  { id: "cl-1", name: "Centre Médical Antananarivo", city: "Antananarivo", address: "Lot II M 34, Analakely", phone: "+261 34 12 345 01" },
   { id: "cl-2", name: "Cabinet Médical Tsara", city: "Antananarivo", address: "Rue Ratsimilaho, Isoraka", phone: "+261 34 12 345 02" },
   { id: "cl-3", name: "Centre Santé Plus", city: "Toamasina", address: "Bd Joffre, Centre-ville", phone: "+261 34 12 345 03" },
   { id: "cl-4", name: "Polyclinique Ravinala", city: "Antsirabe", address: "Av de l'Indépendance", phone: "+261 34 12 345 04" },
@@ -92,7 +95,7 @@ export function generateDemoData(now: Date): DemoData {
     usedNames.add(`${first} ${last}`);
     const name = `${pick(rng, DOCTOR_TITLES)} ${first} ${last}`;
     const specialty = SPECIALTIES[i % SPECIALTIES.length];
-    // Clinique Sourire (cl-1) is the flagship demo clinic: 8 of 20 doctors
+    // Centre Médical Antananarivo (cl-1) is the flagship demo clinic: 8 of 20 doctors
     // work there (including dr-1) so its scoped portal looks busy.
     const clinic = i < 8 ? CLINICS[0] : pick(rng, CLINICS.slice(1));
     doctors.push({
@@ -114,7 +117,7 @@ export function generateDemoData(now: Date): DemoData {
 
   // Patients
   const patients: Patient[] = [];
-  for (let i = 0; i < 50; i++) {
+  for (let i = 0; i < 160; i++) {
     const gender = rng() > 0.5 ? "F" : "M";
     const first = gender === "F" ? pick(rng, FIRST_F) : pick(rng, FIRST_M);
     const last = pick(rng, LAST);
@@ -202,6 +205,102 @@ export function generateDemoData(now: Date): DemoData {
     }
   }
 
+  // The flagship clinic's lead practitioners are named for the demo script.
+  const FLAGSHIP_NAMES = ["Dr. Rakoto", "Dr. Rasoanaivo", "Dr. Andriam"];
+  FLAGSHIP_NAMES.forEach((name, i) => {
+    if (doctors[i]) {
+      doctors[i].name = name;
+      doctors[i].bio = `${name} practises ${SPECIALTIES[i % SPECIALTIES.length].name.toLowerCase()} at Centre Médical Antananarivo, combining modern technique with unhurried, compassionate care.`;
+      doctors[i].email = `${name.toLowerCase().replace(/[^a-z]+/g, ".")}@centremedical.mg`;
+    }
+  });
+
+  // --- Clinical + financial records (demo depth for clinic owners) --------
+  const DIAGNOSES = [
+    "Hypertension artérielle",
+    "Infection respiratoire",
+    "Carie dentaire",
+    "Gastrite",
+    "Paludisme simple",
+    "Lombalgie",
+    "Diabète type 2 — suivi",
+    "Angine bactérienne",
+    "Contrôle post-opératoire",
+    "Dermatite allergique",
+  ];
+  const DRUGS: [string, string][] = [
+    ["Paracétamol 500mg", "1 cp x3/jour, 5 jours"],
+    ["Amoxicilline 1g", "1 cp x2/jour, 7 jours"],
+    ["Ibuprofène 400mg", "1 cp x3/jour, 3 jours"],
+    ["Oméprazole 20mg", "1 gél/jour, 14 jours"],
+    ["Metformine 850mg", "1 cp x2/jour, continu"],
+    ["Amlodipine 5mg", "1 cp/jour, continu"],
+    ["Artéméther-Luméfantrine", "selon protocole, 3 jours"],
+    ["Cétirizine 10mg", "1 cp/soir, 7 jours"],
+  ];
+
+  const records: MedicalRecord[] = [];
+  const prescriptions: Prescription[] = [];
+  const invoices: Invoice[] = [];
+  let invoiceSeq = 1;
+
+  for (const appt of appointments) {
+    if (appt.status === "completed") {
+      const diagnosis = pick(rng, DIAGNOSES);
+      const recordId = `mr-${appt.id}`;
+      records.push({
+        id: recordId,
+        appointmentId: appt.id,
+        patientId: appt.patientId,
+        doctorId: appt.doctorId,
+        date: appt.start,
+        diagnosis,
+        notes: `Consultation ${new Date(appt.start).toLocaleDateString("fr-FR")}. ${diagnosis}. État général satisfaisant, contrôle recommandé.`,
+        vitals: {
+          bloodPressure: `${110 + Math.floor(rng() * 40)}/${70 + Math.floor(rng() * 20)}`,
+          temperatureC: Number((36.2 + rng() * 1.6).toFixed(1)),
+          weightKg: Number((45 + rng() * 45).toFixed(1)),
+          pulseBpm: 60 + Math.floor(rng() * 40),
+        },
+      });
+
+      if (rng() > 0.25) {
+        const lines = Array.from(
+          { length: 1 + Math.floor(rng() * 2) },
+          () => pick(rng, DRUGS),
+        ).map(([drug, dosage]) => ({ drug, dosage }));
+        prescriptions.push({
+          id: `rx-${appt.id}`,
+          appointmentId: appt.id,
+          patientId: appt.patientId,
+          doctorId: appt.doctorId,
+          date: appt.start,
+          lines,
+        });
+      }
+    }
+
+    // Invoices for anything that was actually delivered or is prepaid.
+    if (appt.status === "completed" || appt.paymentStatus === "paid") {
+      invoices.push({
+        id: `inv-${appt.id}`,
+        number: `FA-${new Date(appt.start).getFullYear()}-${String(invoiceSeq++).padStart(4, "0")}`,
+        appointmentId: appt.id,
+        patientId: appt.patientId,
+        clinicId: appt.clinicId,
+        issuedAt: appt.start,
+        amount: appt.fee,
+        status:
+          appt.paymentStatus === "paid"
+            ? "paid"
+            : appt.paymentStatus === "failed"
+              ? "overdue"
+              : "unpaid",
+        method: appt.paymentMethod,
+      });
+    }
+  }
+
   // Schedules — kept coherent with the appointment generator above
   // (appointments are seeded Mon–Sat between 08:00 and 17:00, none Sunday).
   // A couple of doctors get a vacation placed beyond the +21d appointment
@@ -272,7 +371,18 @@ export function generateDemoData(now: Date): DemoData {
     },
   ];
 
-  return { specialties: SPECIALTIES, clinics: CLINICS, doctors, patients, appointments, schedules, notifications };
+  return {
+    specialties: SPECIALTIES,
+    clinics: CLINICS,
+    doctors,
+    patients,
+    appointments,
+    schedules,
+    notifications,
+    records,
+    prescriptions,
+    invoices,
+  };
 }
 
 export const SPECIALTY_LIST = SPECIALTIES;

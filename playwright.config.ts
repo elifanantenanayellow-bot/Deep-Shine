@@ -68,7 +68,10 @@ export default defineConfig({
     },
     {
       command: "npx next start -p 3003",
-      url: "http://localhost:3003/api/health",
+      // Readiness probe must not depend on the database: /api/health returns
+      // 503 when Postgres is down, which would block even demo-only runs.
+      // The DB-dependent specs assert health themselves.
+      url: "http://localhost:3003/",
       // Never reuse: a server started against an older .next serves stale
       // chunks after a rebuild and fails tests for reasons unrelated to the
       // code under test (observed during M1 as a spurious 20x500 race

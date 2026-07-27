@@ -16,8 +16,8 @@ const PLANS = [
 export default function ClinicSettings() {
   const { ready } = useDemo();
   const [form, setForm] = useState({
-    name: "Clinique Sourire",
-    email: "contact@sourire.mg",
+    name: "Centre Médical Antananarivo",
+    email: "contact@centremedical.mg",
     phone: "+261 34 12 345 01",
     address: "Lot II M 34, Analakely, Antananarivo",
   });

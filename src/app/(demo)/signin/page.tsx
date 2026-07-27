@@ -59,7 +59,7 @@ export default function SignInPage() {
                   icon={<Building2 className="h-5 w-5" />}
                   color="#10b981"
                   title="Clinic admin"
-                  desc="Clinique Sourire: doctors, appointments, revenue"
+                  desc="Centre Médical Antananarivo: doctors, appointments, revenue"
                   onClick={() => router.push("/clinic")}
                 />
               </div>
@@ -96,7 +96,7 @@ export default function SignInPage() {
             <>
               <BackRow onClick={() => setRole(null)} label="Sign in as a doctor" />
               <p className="mt-1 text-sm text-muted-foreground">
-                Pick a practitioner at Clinique Sourire:
+                Pick a practitioner at Centre Médical Antananarivo:
               </p>
               <div className="mt-4 max-h-80 space-y-1 overflow-y-auto">
                 {(ready ? roster : []).map((d) => (

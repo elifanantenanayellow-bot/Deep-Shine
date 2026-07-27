@@ -69,7 +69,7 @@ export default function ClinicRevenue() {
                   a.fee,
                 ]);
               downloadCsv(
-                "revenue-clinique-sourire.csv",
+                "revenue-centre-medical.csv",
                 ["Date", "Time", "Patient", "Doctor", "Specialty", "Status", "Payment", "Fee (MGA)"],
                 rows,
               );

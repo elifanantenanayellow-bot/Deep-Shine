@@ -16,6 +16,10 @@ export const DEMO_ROUTES = [
   "/clinic/doctors",
   "/clinic/patients",
   "/clinic/appointments",
+  "/clinic/reception",
+  "/clinic/billing",
+  "/clinic/notifications",
+  "/clinic/patients/pt-1",
   "/clinic/revenue",
   "/clinic/settings",
 ];

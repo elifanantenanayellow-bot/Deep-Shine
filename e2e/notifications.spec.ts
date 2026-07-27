@@ -10,7 +10,7 @@ test("seeded notifications reference real dataset entities", async ({
   await waitForHydration(page);
 
   const phantom = await page.evaluate(() => {
-    const raw = localStorage.getItem("deepshine-demo-v4");
+    const raw = localStorage.getItem("deepshine-demo-v5");
     if (!raw) return "no-store";
     const data = JSON.parse(raw).data as {
       doctors: { name: string }[];

@@ -71,7 +71,7 @@ export default function ClinicDashboard() {
 
   return (
     <>
-      <PageTitle title="Clinic overview" subtitle="Clinique Sourire · Antananarivo" />
+      <PageTitle title="Clinic overview" subtitle="Centre Médical Antananarivo · Antananarivo" />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard index={0} label="Appointments today" value={String(stats.today)} icon={<CalendarCheck className="h-4 w-4" />} tone="primary" delta={stats.deltas.appointments} />

@@ -10,7 +10,7 @@ test("clinic portal is scoped to its own clinic", async ({ page }) => {
   await page.goto("/clinic/doctors", { waitUntil: "networkidle" });
   await waitForHydration(page);
   await expect(
-    page.getByText(/\d+ practitioners at Clinique Sourire/),
+    page.getByText(/\d+ practitioners at Centre Médical Antananarivo/),
   ).toBeVisible();
 
   // Revenue page must not chart other clinics.
@@ -26,7 +26,7 @@ test("clinic portal is scoped to its own clinic", async ({ page }) => {
   await page.goto("/clinic/appointments", { waitUntil: "networkidle" });
   await waitForHydration(page);
   const foreignDoctorShown = await page.evaluate(() => {
-    const raw = localStorage.getItem("deepshine-demo-v4");
+    const raw = localStorage.getItem("deepshine-demo-v5");
     if (!raw) return "no-store";
     const data = JSON.parse(raw).data;
     const foreign = new Set(

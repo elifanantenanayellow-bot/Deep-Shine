@@ -24,7 +24,7 @@ import type {
 
 // Bump the suffix whenever the persisted shape changes — older payloads are
 // ignored and the demo reseeds instead of crashing.
-const STORAGE_KEY = "deepshine-demo-v4";
+const STORAGE_KEY = "deepshine-demo-v5";
 
 // Persisted envelope: data plus the day it was seeded. Data seeded on a
 // previous day decays ("today" drifts out of the busy window), so it is
@@ -103,6 +103,9 @@ const EMPTY: DemoData = {
   appointments: [],
   schedules: [],
   notifications: [],
+  records: [],
+  prescriptions: [],
+  invoices: [],
 };
 
 export function DemoProvider({ children }: { children: React.ReactNode }) {

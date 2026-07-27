@@ -11,7 +11,7 @@ test("clinic patients export downloads a real CSV", async ({ page }) => {
     page.waitForEvent("download"),
     page.getByRole("button", { name: /export csv/i }).click(),
   ]);
-  expect(download.suggestedFilename()).toBe("patients-clinique-sourire.csv");
+  expect(download.suggestedFilename()).toBe("patients-centre-medical.csv");
 
   const path = await download.path();
   const content = readFileSync(path!, "utf-8");
@@ -29,7 +29,7 @@ test("clinic revenue export downloads the appointment ledger", async ({
     page.waitForEvent("download"),
     page.getByRole("button", { name: /export csv/i }).click(),
   ]);
-  expect(download.suggestedFilename()).toBe("revenue-clinique-sourire.csv");
+  expect(download.suggestedFilename()).toBe("revenue-centre-medical.csv");
   const content = readFileSync((await download.path())!, "utf-8");
   expect(content).toContain("Date,Time,Patient,Doctor");
 });

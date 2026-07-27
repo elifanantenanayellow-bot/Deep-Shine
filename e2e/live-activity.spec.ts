@@ -13,7 +13,7 @@ test("an online booking arrives on the clinic dashboard by itself", async ({
 
   const countAppointments = () =>
     page.evaluate(() => {
-      const raw = localStorage.getItem("deepshine-demo-v4");
+      const raw = localStorage.getItem("deepshine-demo-v5");
       if (!raw) return -1;
       return (JSON.parse(raw) as { data: { appointments: unknown[] } }).data
         .appointments.length;
