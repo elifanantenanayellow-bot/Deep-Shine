@@ -76,8 +76,19 @@ const html = `<!doctype html>
 
 const outFile = resolve(outDir, "deep-shine-demo.html");
 writeFileSync(outFile, html, "utf8");
+
+// Also publish into docs/ so GitHub Pages can serve it straight from the
+// repository (Settings → Pages → Deploy from a branch → /docs). That gives a
+// real https:// URL, which is the only way phones can open the demo — mobile
+// browsers refuse to render local .html files.
+const docsDir = resolve(root, "docs");
+mkdirSync(docsDir, { recursive: true });
+writeFileSync(resolve(docsDir, "index.html"), html, "utf8");
+writeFileSync(resolve(docsDir, ".nojekyll"), "", "utf8");
+
 rmSync(tmp, { recursive: true, force: true });
 
 const kb = Math.round(statSync(outFile).size / 1024);
-console.log(`4/4  Done → dist/deep-shine-demo.html (${kb} KB)`);
-console.log("     Open it by double-clicking. Works offline, no server needed.");
+console.log(`4/4  Done (${kb} KB)`);
+console.log("     dist/deep-shine-demo.html  → double-click, works offline");
+console.log("     docs/index.html            → commit + enable GitHub Pages for a phone-friendly URL");
