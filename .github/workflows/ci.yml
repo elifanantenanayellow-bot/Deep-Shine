@@ -64,6 +64,11 @@ jobs:
         env:
           DATABASE_URL: ${{ env.E2E_DATABASE_URL }}
 
+      # The single-file offline demo must keep building — it is the artifact
+      # handed to customers when hosting isn't available.
+      - name: Build standalone HTML demo
+        run: pnpm run build:standalone
+
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
 

@@ -2,7 +2,7 @@
   "name": "deep-shine",
   "version": "0.1.0",
   "private": true,
-  "description": "Deep-Shine — multi-tenant SaaS appointment booking platform",
+  "description": "Deep-Shine \u2014 multi-tenant SaaS appointment booking platform",
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
@@ -14,7 +14,8 @@
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
-    "db:reset": "prisma migrate reset --force"
+    "db:reset": "prisma migrate reset --force",
+    "build:standalone": "node scripts/build-standalone.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -43,6 +44,7 @@
     "@types/react": "^19.0.4",
     "@types/react-dom": "^19.0.2",
     "autoprefixer": "^10.4.20",
+    "esbuild": "^0.28.1",
     "eslint": "^8.57.1",
     "eslint-config-next": "15.1.4",
     "postcss": "^8.4.49",

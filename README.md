@@ -4,6 +4,23 @@ A modern appointment-booking platform for clinics and doctors in Madagascar —
 delivered as a **fully interactive demo** you can explore end-to-end in the
 browser, plus a database-backed SaaS foundation for the production build.
 
+## 📄 Offline single-file demo (no install, no internet)
+
+For showing the product on any laptop — including a clinic with no
+connection — build one self-contained HTML file:
+
+```bash
+npm install
+npm run build:standalone   # → dist/deep-shine-demo.html (~1 MB)
+```
+
+Double-click that file. It opens in any modern browser (Chrome, Edge,
+Firefox, Safari) straight from the file system: no server, no Node, no
+internet. Email it, put it on a USB stick, or copy it to a customer's machine.
+Everything — React, charts, animations, styles, all demo data — is inlined.
+Add `?presenter=1` before the `#` in the address bar to force payments to
+succeed during a live pitch.
+
 ## 🎬 Interactive demo — start here
 
 No database, no auth server, no configuration. Everything runs on realistic
