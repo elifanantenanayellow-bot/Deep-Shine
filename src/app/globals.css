@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 0 0% 100%;
+  --foreground: 222 20% 11%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 20% 11%;
+  --muted: 220 14% 96%;
+  --muted-foreground: 220 9% 46%;
+  --primary: 243 75% 59%;
+  --primary-foreground: 0 0% 100%;
+  --accent: 220 14% 96%;
+  --accent-foreground: 222 20% 11%;
+  --border: 220 13% 91%;
+  --input: 220 13% 91%;
+  --ring: 243 75% 59%;
+  --success: 142 71% 45%;
+  --warning: 38 92% 50%;
+  --danger: 0 72% 51%;
+  --radius: 0.75rem;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
+}
+
+.dark {
+  --background: 222 24% 8%;
+  --foreground: 210 20% 96%;
+  --card: 222 22% 11%;
+  --card-foreground: 210 20% 96%;
+  --muted: 217 19% 17%;
+  --muted-foreground: 218 11% 65%;
+  --primary: 243 75% 66%;
+  --primary-foreground: 0 0% 100%;
+  --accent: 217 19% 17%;
+  --accent-foreground: 210 20% 96%;
+  --border: 217 19% 20%;
+  --input: 217 19% 20%;
+  --ring: 243 75% 66%;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.ds-gradient {
+  background-image: radial-gradient(
+      60% 60% at 80% 0%,
+      hsl(243 75% 59% / 0.14),
+      transparent 60%
+    ),
+    radial-gradient(50% 50% at 0% 30%, hsl(199 89% 48% / 0.12), transparent 60%);
+}
+
+/* Printing a service summary or prescription: hide the application chrome and
+   put only the document on the page. Signature lines need real ink space. */
+@media print {
+  body {
+    background: #fff;
+    color: #000;
+  }
+  body * {
+    visibility: hidden;
+  }
+  #print-area,
+  #print-area * {
+    visibility: visible;
+  }
+  #print-area {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    max-width: none;
+    border: 0;
+    box-shadow: none;
+    padding: 0;
+  }
+  .no-print {
+    display: none !important;
+  }
+}

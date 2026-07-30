@@ -1,0 +1,394 @@
+// Deep-Shine — multi-tenant SaaS booking platform
+// Isolation invariant: every tenant-scoped table carries a non-null
+// organizationId with an index. Application code scopes all tenant queries
+// through src/lib/tenant.ts (the tenantDb seam).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum PlatformRole {
+  PLATFORM_OWNER
+  USER
+}
+
+enum MembershipRole {
+  CLINIC_OWNER
+  DOCTOR
+  DENTIST
+  RECEPTIONIST
+  ASSISTANT
+}
+
+enum OrgStatus {
+  TRIAL
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+}
+
+enum PlanTier {
+  STARTER
+  PROFESSIONAL
+  BUSINESS
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  SUSPENDED
+  CANCELLED
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+  RESCHEDULED
+}
+
+enum AppointmentSource {
+  ONLINE
+  STAFF
+}
+
+enum PaymentMethod {
+  MVOLA
+  ORANGE_MONEY
+  AIRTEL_MONEY
+  CASH
+  BANK_TRANSFER
+  VISA
+  MASTERCARD
+  STRIPE
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  PARTIAL
+  REFUNDED
+  FAILED
+}
+
+enum PaymentKind {
+  FULL
+  DEPOSIT
+  BALANCE
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PAID
+  VOID
+}
+
+// ---------------------------------------------------------------------------
+// Identity
+// ---------------------------------------------------------------------------
+
+model User {
+  id              String       @id @default(cuid())
+  email           String       @unique
+  passwordHash    String
+  name            String
+  phone           String?
+  platformRole    PlatformRole @default(USER)
+  twoFactorSecret String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  memberships Membership[]
+  patients    Patient[]
+  auditLogs   AuditLog[]
+
+  @@index([platformRole])
+}
+
+// Tenant
+model Organization {
+  id        String    @id @default(cuid())
+  name      String
+  slug      String    @unique
+  status    OrgStatus @default(TRIAL)
+  timezone  String    @default("Indian/Antananarivo")
+  currency  String    @default("MGA")
+  email     String?
+  phone     String?
+  address   String?
+  logoUrl   String?
+  brandColor String   @default("#4f46e5")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  memberships   Membership[]
+  subscription  Subscription?
+  services      Service[]
+  practitioners Practitioner[]
+  patients      Patient[]
+  appointments  Appointment[]
+  payments      Payment[]
+  invoices      Invoice[]
+  reviews       Review[]
+  auditLogs     AuditLog[]
+
+  @@index([status])
+}
+
+model Membership {
+  id             String         @id @default(cuid())
+  userId         String
+  organizationId String
+  role           MembershipRole @default(RECEPTIONIST)
+  permissions    String[]       @default([])
+  createdAt      DateTime       @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  practitioner Practitioner?
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
+}
+
+// ---------------------------------------------------------------------------
+// Billing
+// ---------------------------------------------------------------------------
+
+model Plan {
+  id           String   @id @default(cuid())
+  tier         PlanTier @unique
+  name         String
+  priceCents   Int
+  currency     String   @default("MGA")
+  maxStaff     Int
+  maxMonthlyAppointments Int?
+  features     String[] @default([])
+  createdAt    DateTime @default(now())
+
+  subscriptions Subscription[]
+}
+
+model Subscription {
+  id               String             @id @default(cuid())
+  organizationId   String             @unique
+  planId           String
+  status           SubscriptionStatus @default(TRIALING)
+  priceCents       Int
+  currency         String             @default("MGA")
+  currentPeriodEnd DateTime
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan         Plan         @relation(fields: [planId], references: [id])
+
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Tenant domain
+// ---------------------------------------------------------------------------
+
+model Service {
+  id               String   @id @default(cuid())
+  organizationId   String
+  name             String
+  description      String?
+  durationMin      Int      @default(30)
+  priceCents       Int      @default(0)
+  bufferBeforeMin  Int      @default(0)
+  bufferAfterMin   Int      @default(0)
+  color            String   @default("#4f46e5")
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  appointments Appointment[]
+
+  @@index([organizationId])
+}
+
+model Practitioner {
+  id             String   @id @default(cuid())
+  organizationId String
+  membershipId   String?  @unique
+  displayName    String
+  specialty      String?
+  color          String   @default("#0ea5e9")
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  membership   Membership?   @relation(fields: [membershipId], references: [id], onDelete: SetNull)
+  workingHours WorkingHours[]
+  timeOff      TimeOff[]
+  appointments Appointment[]
+  reviews      Review[]
+
+  @@index([organizationId])
+}
+
+model WorkingHours {
+  id             String @id @default(cuid())
+  organizationId String
+  practitionerId String
+  weekday        Int // 0=Sunday ... 6=Saturday
+  startMinutes   Int // minutes from midnight, tenant timezone
+  endMinutes     Int
+
+  practitioner Practitioner @relation(fields: [practitionerId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([practitionerId, weekday])
+}
+
+model TimeOff {
+  id             String   @id @default(cuid())
+  organizationId String
+  practitionerId String
+  reason         String?
+  startsAt       DateTime
+  endsAt         DateTime
+
+  practitioner Practitioner @relation(fields: [practitionerId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([practitionerId, startsAt])
+}
+
+model Patient {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String?
+  firstName      String
+  lastName       String
+  email          String?
+  phone          String?
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  appointments Appointment[]
+  reviews      Review[]
+
+  @@index([organizationId])
+  @@index([organizationId, phone])
+}
+
+model Appointment {
+  id             String            @id @default(cuid())
+  organizationId String
+  patientId      String
+  practitionerId String
+  serviceId      String
+  startsAt       DateTime
+  endsAt         DateTime
+  status         AppointmentStatus @default(PENDING)
+  source         AppointmentSource @default(ONLINE)
+  priceCents     Int               @default(0)
+  notes          String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  patient      Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  practitioner Practitioner @relation(fields: [practitionerId], references: [id], onDelete: Cascade)
+  service      Service      @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  payments     Payment[]
+  invoice      Invoice?
+  review       Review?
+
+  @@index([organizationId, startsAt])
+  @@index([practitionerId, startsAt])
+  @@index([organizationId, status])
+}
+
+model Payment {
+  id             String        @id @default(cuid())
+  organizationId String
+  appointmentId  String?
+  amountCents    Int
+  currency       String        @default("MGA")
+  method         PaymentMethod
+  status         PaymentStatus @default(PENDING)
+  kind           PaymentKind   @default(FULL)
+  reference      String?
+  createdAt      DateTime      @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  appointment  Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status])
+}
+
+model Invoice {
+  id             String        @id @default(cuid())
+  organizationId String
+  appointmentId  String?       @unique
+  number         String
+  totalCents     Int
+  currency       String        @default("MGA")
+  status         InvoiceStatus @default(ISSUED)
+  issuedAt       DateTime      @default(now())
+  paidAt         DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  appointment  Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, number])
+  @@index([organizationId])
+}
+
+model Review {
+  id             String   @id @default(cuid())
+  organizationId String
+  appointmentId  String?  @unique
+  patientId      String
+  practitionerId String?
+  rating         Int
+  comment        String?
+  createdAt      DateTime @default(now())
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  appointment  Appointment?  @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  patient      Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  practitioner Practitioner? @relation(fields: [practitionerId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+}
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String?
+  actorUserId    String?
+  action         String
+  entity         String
+  entityId       String?
+  meta           Json?
+  ip             String?
+  createdAt      DateTime @default(now())
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  actor        User?         @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+}
