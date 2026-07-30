@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { waitForHydration } from "./helpers";
+import { STORAGE_KEY } from "../src/demo/storage-key";
 
 // Seeded notifications must reference people who actually exist in the
 // generated dataset — no phantom doctors or patients.
@@ -9,8 +10,8 @@ test("seeded notifications reference real dataset entities", async ({
   await page.goto("/patient", { waitUntil: "networkidle" });
   await waitForHydration(page);
 
-  const phantom = await page.evaluate(() => {
-    const raw = localStorage.getItem("deepshine-demo-v5");
+  const phantom = await page.evaluate((key) => {
+    const raw = localStorage.getItem(key);
     if (!raw) return "no-store";
     const data = JSON.parse(raw).data as {
       doctors: { name: string }[];
@@ -31,7 +32,7 @@ test("seeded notifications reference real dataset entities", async ({
       }
     }
     return missing;
-  });
+  }, STORAGE_KEY);
 
   expect(phantom).toEqual([]);
 

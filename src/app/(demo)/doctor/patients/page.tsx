@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import Link from "next/link";
+import { Search, ChevronRight } from "lucide-react";
 import { useDemo } from "@/demo/store";
 import { PageTitle, DashboardSkeleton } from "@/components/demo/portal-shell";
 import { Avatar, EmptyState } from "@/components/demo/primitives";
@@ -56,6 +57,7 @@ export default function DoctorPatients() {
                   <th className="px-4 py-3">Visits</th>
                   <th className="px-4 py-3">Last visit</th>
                   <th className="px-4 py-3">Total paid</th>
+                  <th className="px-4 py-3 text-right">Card</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -74,6 +76,14 @@ export default function DoctorPatients() {
                     <td className="px-4 py-3 tabular-nums">{r.visits}</td>
                     <td className="px-4 py-3">{new Date(r.last).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}</td>
                     <td className="px-4 py-3 tabular-nums font-medium">{formatMoney(r.spent)}</td>
+                    <td className="px-4 py-3 text-right">
+                      <Link
+                        href={`/doctor/patients/${r.patient.id}`}
+                        className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                      >
+                        Open <ChevronRight className="h-3.5 w-3.5" />
+                      </Link>
+                    </td>
                   </tr>
                 ))}
               </tbody>

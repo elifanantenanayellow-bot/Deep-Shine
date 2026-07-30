@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useMemo } from "react";
+import { use, useMemo, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
@@ -13,6 +13,8 @@ import {
   Pill,
   Receipt,
   CalendarClock,
+  Lock,
+  FileSignature,
 } from "lucide-react";
 import { useDemo } from "@/demo/store";
 import { doctorName, specialtyName } from "@/demo/selectors";
@@ -21,6 +23,8 @@ import { Avatar, EmptyState, StatusPill } from "@/components/demo/primitives";
 import { FadeIn } from "@/components/demo/motion";
 import { Button, Card } from "@/components/ui";
 import { formatMoney, formatMoneyCompact, cn } from "@/lib/utils";
+import { ServiceSummary } from "@/components/demo/service-summary";
+import { ProviderNotes } from "@/components/demo/provider-notes";
 
 export default function PatientRecordPage({
   params,
@@ -29,6 +33,7 @@ export default function PatientRecordPage({
 }) {
   const { id } = use(params);
   const { ready, data } = useDemo();
+  const [summaryOpen, setSummaryOpen] = useState(false);
 
   const patient = data.patients.find((p) => p.id === id);
   const appointments = useMemo(
@@ -56,6 +61,16 @@ export default function PatientRecordPage({
     () => data.invoices.filter((i) => i.patientId === id),
     [data.invoices, id],
   );
+  // The care team: providers who have actually treated this person. Clinical
+  // notes are theirs — nobody outside it reads or writes them.
+  const careTeam = useMemo(() => {
+    const ids = new Set(
+      data.appointments
+        .filter((a) => a.patientId === id && a.status !== "cancelled")
+        .map((a) => a.doctorId),
+    );
+    return data.doctors.filter((d) => ids.has(d.id));
+  }, [data.appointments, data.doctors, id]);
 
   if (!ready) return <DashboardSkeleton />;
   if (!patient) {
@@ -101,14 +116,32 @@ export default function PatientRecordPage({
                 <span className="inline-flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" />{patient.city}</span>
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={() => toast.success("Record exported as PDF")}>
                 Export record
+              </Button>
+              <Button variant="outline" className="gap-2" onClick={() => setSummaryOpen(true)}>
+                <FileSignature className="h-4 w-4" /> Service summary
               </Button>
               <Button onClick={() => toast.success(`Appointment request sent to ${patient.name}`)}>
                 Book follow-up
               </Button>
             </div>
+          </div>
+
+          {/* Who may open this card */}
+          <div className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-muted/60 px-3 py-2 text-xs">
+            <Lock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            <span className="text-muted-foreground">Clinical access restricted to the care team:</span>
+            {careTeam.length === 0 ? (
+              <span className="font-medium">no provider assigned yet</span>
+            ) : (
+              careTeam.map((d) => (
+                <span key={d.id} className="rounded-full bg-card px-2 py-0.5 font-medium">
+                  {d.name}
+                </span>
+              ))
+            )}
           </div>
 
           <div className="mt-6 grid grid-cols-2 gap-3 border-t border-border pt-5 sm:grid-cols-4">
@@ -122,8 +155,15 @@ export default function PatientRecordPage({
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
         <FadeIn className="lg:col-span-2">
+          {/* Provider notes, preferences and follow-ups */}
+          <ProviderNotes
+            patientId={patient.id}
+            authorId={careTeam[0]?.id ?? data.doctors[0]?.id ?? "dr-1"}
+            visibleAuthorIds={careTeam.map((d) => d.id)}
+          />
+
           {/* Medical records */}
-          <Card>
+          <Card className="mt-6">
             <div className="flex items-center gap-2 border-b border-border px-5 py-4">
               <FileText className="h-4 w-4 text-primary" />
               <h2 className="font-semibold">Medical records</h2>
@@ -269,6 +309,12 @@ export default function PatientRecordPage({
           </Card>
         </FadeIn>
       </div>
+
+      <ServiceSummary
+        open={summaryOpen}
+        onClose={() => setSummaryOpen(false)}
+        patient={patient}
+      />
     </>
   );
 }

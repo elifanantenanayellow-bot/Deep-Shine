@@ -1,0 +1,233 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Hash, Send, MessageSquare, Users, MapPin } from "lucide-react";
+import { useDemo } from "@/demo/store";
+import { DEMO_CLINIC_ID, DESK_ID } from "@/demo/data";
+import { PageTitle, DashboardSkeleton } from "@/components/demo/portal-shell";
+import { Avatar, EmptyState } from "@/components/demo/primitives";
+import { Button, Card, Input } from "@/components/ui";
+import { cn } from "@/lib/utils";
+
+// The team hub. Thread list on the left, the live conversation in the
+// centre-right where the eye lands — the same place staff will be looking
+// while they work the queue.
+
+function authorLabel(
+  data: ReturnType<typeof useDemo>["data"],
+  id: string,
+): { name: string; hue: number } {
+  if (id === DESK_ID) return { name: "Front desk", hue: 205 };
+  const doctor = data.doctors.find((d) => d.id === id);
+  return { name: doctor?.name ?? "Unknown", hue: doctor?.avatarHue ?? 0 };
+}
+
+export default function MessagesPage() {
+  const { ready, data, sendMessage, markThreadRead } = useDemo();
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+  const endRef = useRef<HTMLDivElement>(null);
+
+  const threads = useMemo(
+    () => data.threads.filter((t) => t.clinicId === DEMO_CLINIC_ID),
+    [data.threads],
+  );
+
+  const active = activeId
+    ? (threads.find((t) => t.id === activeId) ?? threads[0])
+    : threads[0];
+
+  const conversation = useMemo(
+    () =>
+      data.messages
+        .filter((m) => m.threadId === active?.id)
+        .sort((a, b) => +new Date(a.createdAt) - +new Date(b.createdAt)),
+    [data.messages, active?.id],
+  );
+
+  // Opening a thread clears its badge, and new messages scroll into view.
+  const activeThreadId = active?.id;
+  useEffect(() => {
+    if (activeThreadId) markThreadRead(activeThreadId);
+  }, [activeThreadId, markThreadRead]);
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ block: "nearest" });
+  }, [conversation.length]);
+
+  if (!ready) return <DashboardSkeleton />;
+
+  const unreadFor = (threadId: string) =>
+    data.messages.filter((m) => m.threadId === threadId && !m.read).length;
+
+  const totalUnread = data.messages.filter(
+    (m) => !m.read && threads.some((t) => t.id === m.threadId),
+  ).length;
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!active || !draft.trim()) return;
+    sendMessage(active.id, DESK_ID, draft);
+    setDraft("");
+  }
+
+  return (
+    <>
+      <PageTitle
+        title="Team hub"
+        subtitle={
+          totalUnread > 0
+            ? `${totalUnread} unread message${totalUnread > 1 ? "s" : ""} · everyone on the platform, one inbox`
+            : "Everyone on the platform, one inbox — across both sites"
+        }
+      />
+
+      {threads.length === 0 ? (
+        <EmptyState
+          icon={<MessageSquare className="h-8 w-8" />}
+          title="No conversations yet"
+          description="Reset the demo data to restore the seeded team channels."
+        />
+      ) : (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
+          {/* Thread list */}
+          <Card className="h-fit overflow-hidden">
+            <p className="border-b border-border px-4 py-3 text-[11px] uppercase text-muted-foreground">
+              Conversations
+            </p>
+            <ul className="divide-y divide-border">
+              {threads.map((t) => {
+                const unread = unreadFor(t.id);
+                const last = data.messages
+                  .filter((m) => m.threadId === t.id)
+                  .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))[0];
+                const selected = active?.id === t.id;
+                return (
+                  <li key={t.id}>
+                    <button
+                      onClick={() => setActiveId(t.id)}
+                      aria-current={selected ? "true" : undefined}
+                      className={cn(
+                        "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors",
+                        selected ? "bg-primary/10" : "hover:bg-muted/60",
+                      )}
+                    >
+                      {t.kind === "channel" ? (
+                        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-muted">
+                          <Hash className="h-4 w-4 text-muted-foreground" />
+                        </span>
+                      ) : (
+                        <Avatar
+                          name={t.name}
+                          hue={data.doctors.find((d) => t.participantIds.includes(d.id))?.avatarHue ?? 220}
+                          size={32}
+                        />
+                      )}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium">{t.name}</span>
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {last?.body ?? "No messages yet"}
+                        </span>
+                      </span>
+                      {unread > 0 && (
+                        <span className="grid h-5 min-w-[20px] shrink-0 place-items-center rounded-full bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground">
+                          {unread}
+                        </span>
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </Card>
+
+          {/* Conversation — centre-right */}
+          {active && (
+            <Card className="flex min-h-[520px] flex-col">
+              <div className="flex flex-wrap items-center gap-3 border-b border-border px-5 py-3">
+                <h2 className="font-semibold">
+                  {active.kind === "channel" ? `# ${active.name}` : active.name}
+                </h2>
+                <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Users className="h-3.5 w-3.5" />
+                  {active.participantIds.length} member
+                  {active.participantIds.length > 1 ? "s" : ""}
+                </span>
+                <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <MapPin className="h-3.5 w-3.5" />
+                  {[
+                    ...new Set(
+                      active.participantIds
+                        .map((id) => data.doctors.find((d) => d.id === id)?.site)
+                        .filter(Boolean),
+                    ),
+                  ].join(" · ") || "Front desk"}
+                </span>
+              </div>
+
+              <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
+                {conversation.length === 0 ? (
+                  <p className="py-10 text-center text-sm text-muted-foreground">
+                    No messages yet — say hello.
+                  </p>
+                ) : (
+                  conversation.map((m) => {
+                    const author = authorLabel(data, m.authorId);
+                    const mine = m.authorId === DESK_ID;
+                    return (
+                      <div
+                        key={m.id}
+                        className={cn("flex gap-3", mine && "flex-row-reverse")}
+                      >
+                        <Avatar name={author.name} hue={author.hue} size={30} />
+                        <div className={cn("max-w-[78%]", mine && "text-right")}>
+                          <p className="text-[11px] text-muted-foreground">
+                            {author.name} ·{" "}
+                            {new Date(m.createdAt).toLocaleTimeString("fr-FR", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </p>
+                          <p
+                            className={cn(
+                              "mt-1 inline-block rounded-2xl px-3.5 py-2 text-sm",
+                              mine
+                                ? "rounded-tr-sm bg-primary text-primary-foreground"
+                                : "rounded-tl-sm bg-muted",
+                            )}
+                          >
+                            {m.body}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+                <div ref={endRef} />
+              </div>
+
+              <form
+                onSubmit={submit}
+                className="flex items-center gap-2 border-t border-border p-3"
+              >
+                <label htmlFor="hub-draft" className="sr-only">
+                  Message {active.name}
+                </label>
+                <Input
+                  id="hub-draft"
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  placeholder={`Message ${active.kind === "channel" ? `#${active.name}` : active.name}…`}
+                  className="min-w-0 flex-1"
+                />
+                <Button type="submit" disabled={!draft.trim()} className="gap-2">
+                  <Send className="h-4 w-4" /> Send
+                </Button>
+              </form>
+            </Card>
+          )}
+        </div>
+      )}
+    </>
+  );
+}

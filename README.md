@@ -38,7 +38,19 @@ npm run dev
 | `/` Landing      | Hero, features, pricing, testimonials, FAQ, CTA — animated                  |
 | `/patient`       | Dashboard, search & filter doctors, profiles, live availability, **book → pay (MVola/Orange/Airtel/Card simulated) → confirmation**, cancel, reschedule, settings, persona switching |
 | `/doctor`        | Today's schedule (mark completed/no-show), weekly calendar, patient list, earnings + analytics charts, availability & time-off management |
-| `/clinic`        | KPI dashboard with charts, doctors management (add doctors), patients, appointment management, revenue & reports, settings |
+| `/clinic`        | KPI dashboard with charts, **walk-in ticketing with auto-routing**, **shared team calendar**, **team hub inbox**, patients & customer cards, doctors management, billing with manual payment entry, **costs & profit**, revenue & reports, settings |
+
+### Running the clinic day-to-day
+
+| Screen | What it does |
+|---|---|
+| `/clinic/reception` | Issue a walk-in ticket: the platform picks whichever provider can see the person soonest, books the slot on their calendar and emails them. The queue tracks the ticket through *routed → in service → done*, and cancelling a ticket frees the slot again. |
+| `/clinic/calendar` | One column per practitioner, one row per half hour, across both clinic sites. Everything booked anywhere — online, at the desk, or auto-routed from a ticket — appears here immediately. Walk-ins are colour-coded. |
+| `/clinic/messages` | The shared team inbox. Channels for the front desk and the clinical team plus direct messages, with unread badges in the sidebar. Every routed ticket also posts to `#Front desk`. |
+| `/clinic/costs` | Cost vs revenue. Costs are entered by hand (the platform never touches your bank); the page shows profit, margin, six months of revenue-against-cost and where the money goes by category. |
+| `/clinic/billing` | Record a payment already taken at the desk — pick the method and the invoice and its appointment settle together. Nothing is charged automatically. |
+| `/clinic/patients/[id]` | The customer card: contact, booking history, medical records, invoices, plus **provider notes** (preferences, care instructions, follow-ups with due dates) and a **printable, signable service summary**. The card names the care team that may open it. |
+| `/doctor/patients/[id]` | The same card from the provider's side — and it refuses to open for a patient the signed-in practitioner does not treat. Switch personas in the sidebar to see the access check work. |
 
 Booking instantly updates every calendar and dashboard; cancelling updates the
 statistics; payments simulate success / pending / failure; notifications appear

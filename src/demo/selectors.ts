@@ -2,6 +2,7 @@
 
 import type {
   Appointment,
+  CostEntry,
   DemoData,
   Doctor,
   Patient,
@@ -261,6 +262,120 @@ export function nextFreeSlot(
     }
   }
   return null;
+}
+
+// --- Walk-in auto-routing ---------------------------------------------------
+// Picks the provider a walk-in should go to: whoever can see them soonest.
+// Ties (two providers free at the same time) go to the lighter caseload that
+// day, so the queue spreads across the team instead of piling on one person.
+export interface RoutingChoice {
+  doctorId: string;
+  iso: string;
+  time: string;
+  sameDay: boolean;
+  loadToday: number;
+}
+
+export function routeWalkIn(
+  data: DemoData,
+  clinicId: string,
+  options: { specialtyId?: string; doctorId?: string } = {},
+): RoutingChoice | null {
+  const pool = data.doctors.filter(
+    (d) =>
+      d.clinicId === clinicId &&
+      (!options.doctorId || d.id === options.doctorId) &&
+      (!options.specialtyId || d.specialtyId === options.specialtyId),
+  );
+  if (pool.length === 0) return null;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  let best: RoutingChoice | null = null;
+  for (let offset = 0; offset < 7; offset++) {
+    const day = new Date(today);
+    day.setDate(day.getDate() + offset);
+    for (const doctor of pool) {
+      const free = availableSlots(data, doctor.id, day).filter((s) => !s.taken);
+      if (free.length === 0) continue;
+      const loadToday = data.appointments.filter(
+        (a) =>
+          a.doctorId === doctor.id &&
+          a.status !== "cancelled" &&
+          isSameDay(new Date(a.start), day),
+      ).length;
+      const candidate: RoutingChoice = {
+        doctorId: doctor.id,
+        iso: free[0].iso,
+        time: free[0].time,
+        sameDay: offset === 0,
+        loadToday,
+      };
+      if (
+        !best ||
+        candidate.iso < best.iso ||
+        (candidate.iso === best.iso && candidate.loadToday < best.loadToday)
+      ) {
+        best = candidate;
+      }
+    }
+    if (best) return best; // earliest day wins; never look further than needed
+  }
+  return null;
+}
+
+// --- Cost vs revenue --------------------------------------------------------
+export interface MonthlyFinance {
+  label: string;
+  month: string; // ISO of the first of the month
+  revenue: number;
+  costs: number;
+  profit: number;
+  customers: number;
+}
+
+export function monthlyFinance(
+  appts: Appointment[],
+  costs: CostEntry[],
+  now: Date,
+  months = 6,
+): MonthlyFinance[] {
+  const out: MonthlyFinance[] = [];
+  for (let i = months - 1; i >= 0; i--) {
+    const from = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const to = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
+    const inMonth = appts.filter((a) => {
+      const s = new Date(a.start);
+      return s >= from && s < to;
+    });
+    const revenue = inMonth
+      .filter((a) => a.paymentStatus === "paid")
+      .reduce((s, a) => s + a.fee, 0);
+    const cost = costs
+      .filter((c) => {
+        const d = new Date(c.date);
+        return d >= from && d < to;
+      })
+      .reduce((s, c) => s + c.amount, 0);
+    out.push({
+      label: from.toLocaleDateString("fr-FR", { month: "short" }),
+      month: from.toISOString(),
+      revenue,
+      costs: cost,
+      profit: revenue - cost,
+      customers: new Set(inMonth.map((a) => a.patientId)).size,
+    });
+  }
+  return out;
+}
+
+export function costsByCategory(costs: CostEntry[]) {
+  const map = new Map<string, number>();
+  for (const c of costs) map.set(c.category, (map.get(c.category) ?? 0) + c.amount);
+  return [...map.entries()]
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value);
 }
 
 export function revenueByMethod(appts: Appointment[]) {

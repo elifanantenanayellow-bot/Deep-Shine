@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { collectErrors, waitForHydration } from "./helpers";
+import { STORAGE_KEY } from "../src/demo/storage-key";
 
 // The clinic dashboard simulates online bookings arriving live: the first
 // one fires ~8s after the dashboard opens.
@@ -12,12 +13,12 @@ test("an online booking arrives on the clinic dashboard by itself", async ({
   await waitForHydration(page);
 
   const countAppointments = () =>
-    page.evaluate(() => {
-      const raw = localStorage.getItem("deepshine-demo-v5");
+    page.evaluate((key) => {
+      const raw = localStorage.getItem(key);
       if (!raw) return -1;
       return (JSON.parse(raw) as { data: { appointments: unknown[] } }).data
         .appointments.length;
-    });
+    }, STORAGE_KEY);
   const before = await countAppointments();
   expect(before).toBeGreaterThan(0);
 

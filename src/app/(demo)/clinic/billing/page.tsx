@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Download, Wallet, Clock, AlertTriangle, Search, Receipt } from "lucide-react";
-import { useDemo } from "@/demo/store";
+import { useDemo, PAYMENT_METHODS } from "@/demo/store";
 import { DEMO_CLINIC_ID } from "@/demo/data";
 import { downloadCsv } from "@/demo/csv";
 import { patientName } from "@/demo/selectors";
@@ -23,17 +23,18 @@ const STATUS_STYLE: Record<string, string> = {
 };
 
 export default function BillingPage() {
-  const { ready, data } = useDemo();
+  const { ready, data, recordPayment } = useDemo();
   const [filter, setFilter] = useState<Filter>("all");
   const [q, setQ] = useState("");
-  const [paidLocally, setPaidLocally] = useState<Record<string, true>>({});
+  // Which invoice's payment-method picker is open. Payments are entered by
+  // hand — the platform records money the desk has already taken.
+  const [entering, setEntering] = useState<string | null>(null);
 
   const invoices = useMemo(() => {
     return data.invoices
       .filter((i) => i.clinicId === DEMO_CLINIC_ID)
-      .map((i) => ({ ...i, status: paidLocally[i.id] ? ("paid" as const) : i.status }))
       .sort((a, b) => +new Date(b.issuedAt) - +new Date(a.issuedAt));
-  }, [data.invoices, paidLocally]);
+  }, [data.invoices]);
 
   const visible = useMemo(() => {
     let rows = invoices;
@@ -149,15 +150,33 @@ export default function BillingPage() {
                         >
                           Send receipt
                         </button>
+                      ) : entering === i.id ? (
+                        <span className="inline-flex flex-wrap justify-end gap-1">
+                          {PAYMENT_METHODS.map((m) => (
+                            <button
+                              key={m}
+                              className="rounded-full border border-border px-2 py-0.5 text-[11px] font-medium hover:bg-muted"
+                              onClick={() => {
+                                recordPayment(i.appointmentId, m);
+                                setEntering(null);
+                              }}
+                            >
+                              {m}
+                            </button>
+                          ))}
+                          <button
+                            className="px-1.5 text-[11px] text-muted-foreground hover:underline"
+                            onClick={() => setEntering(null)}
+                          >
+                            Cancel
+                          </button>
+                        </span>
                       ) : (
                         <button
                           className="text-xs font-medium text-emerald-600 hover:underline"
-                          onClick={() => {
-                            setPaidLocally((p) => ({ ...p, [i.id]: true }));
-                            toast.success(`${i.number} marked as paid`);
-                          }}
+                          onClick={() => setEntering(i.id)}
                         >
-                          Mark paid
+                          Record payment
                         </button>
                       )}
                     </td>

@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { collectErrors, waitForHydration } from "./helpers";
+import { STORAGE_KEY } from "../src/demo/storage-key";
 
 // The clinic portal is a tenant view: it must only surface Clinique
 // Sourire's own doctors, appointments and finances.
@@ -25,8 +26,8 @@ test("clinic portal is scoped to its own clinic", async ({ page }) => {
   // list belongs to cl-1 (compare against the persisted demo store).
   await page.goto("/clinic/appointments", { waitUntil: "networkidle" });
   await waitForHydration(page);
-  const foreignDoctorShown = await page.evaluate(() => {
-    const raw = localStorage.getItem("deepshine-demo-v5");
+  const foreignDoctorShown = await page.evaluate((key) => {
+    const raw = localStorage.getItem(key);
     if (!raw) return "no-store";
     const data = JSON.parse(raw).data;
     const foreign = new Set(
@@ -36,7 +37,7 @@ test("clinic portal is scoped to its own clinic", async ({ page }) => {
     );
     const cells = Array.from(document.querySelectorAll("td"));
     return cells.some((td) => foreign.has(td.textContent?.trim() ?? ""));
-  });
+  }, STORAGE_KEY);
   expect(foreignDoctorShown).toBe(false);
 
   expect(errors).toEqual([]);

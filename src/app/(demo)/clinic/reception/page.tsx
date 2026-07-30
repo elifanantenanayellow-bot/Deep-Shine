@@ -10,25 +10,49 @@ import {
   XCircle,
   Search,
   Phone,
+  TicketIcon,
+  Mail,
+  ArrowRight,
+  Zap,
 } from "lucide-react";
 import { useDemo } from "@/demo/store";
 import { DEMO_CLINIC_ID } from "@/demo/data";
-import { doctorName, patientName, specialtyName, isSameDay } from "@/demo/selectors";
+import {
+  doctorName,
+  patientName,
+  specialtyName,
+  isSameDay,
+  routeWalkIn,
+} from "@/demo/selectors";
 import { PageTitle, DashboardSkeleton } from "@/components/demo/portal-shell";
 import { StatCard } from "@/components/demo/stat-card";
 import { Avatar, EmptyState, StatusPill } from "@/components/demo/primitives";
 import { FadeIn } from "@/components/demo/motion";
-import { Button, Card, Input } from "@/components/ui";
+import { Button, Card, Input, Label } from "@/components/ui";
 import { formatMoney, cn } from "@/lib/utils";
+
+const WALK_IN_SERVICES = [
+  "Consultation générale",
+  "Détartrage",
+  "Douleur persistante",
+  "Renouvellement d'ordonnance",
+  "Vaccination",
+  "Bilan de santé",
+];
 
 // The front-desk view: who is expected today, who has arrived, who is with a
 // doctor. Check-in state is local to the session (front-desk flow demo).
 type Desk = "expected" | "waiting" | "in_consult";
 
 export default function ReceptionPage() {
-  const { ready, data, markStatus } = useDemo();
+  const { ready, data, markStatus, issueTicket, setTicketStatus } = useDemo();
   const [desk, setDesk] = useState<Record<string, Desk>>({});
   const [q, setQ] = useState("");
+
+  // Walk-in ticket form
+  const [walkInPatient, setWalkInPatient] = useState("");
+  const [service, setService] = useState(WALK_IN_SERVICES[0]);
+  const [specialtyId, setSpecialtyId] = useState("any");
 
   const today = useMemo(() => {
     const now = new Date();
@@ -52,6 +76,42 @@ export default function ReceptionPage() {
     );
   }, [today, q, data]);
 
+  // Live queue of walk-in tickets issued at this desk.
+  const tickets = useMemo(
+    () =>
+      data.tickets
+        .filter((t) => t.clinicId === DEMO_CLINIC_ID)
+        .sort((a, b) => +new Date(b.issuedAt) - +new Date(a.issuedAt)),
+    [data.tickets],
+  );
+  const openTickets = tickets.filter(
+    (t) => t.status === "routed" || t.status === "in_service",
+  );
+
+  // Show the desk who would take the ticket before it is issued — the
+  // routing decision should never be a surprise.
+  const preview = useMemo(
+    () =>
+      routeWalkIn(data, DEMO_CLINIC_ID, {
+        specialtyId: specialtyId === "any" ? undefined : specialtyId,
+      }),
+    [data, specialtyId],
+  );
+
+  // Specialties actually practised at this clinic — offering the rest would
+  // route to nobody.
+  const clinicSpecialties = useMemo(() => {
+    const ids = new Set(
+      data.doctors.filter((d) => d.clinicId === DEMO_CLINIC_ID).map((d) => d.specialtyId),
+    );
+    return data.specialties.filter((s) => ids.has(s.id));
+  }, [data.doctors, data.specialties]);
+
+  const clinicPatients = useMemo(
+    () => data.patients.slice(0, 160),
+    [data.patients],
+  );
+
   if (!ready) return <DashboardSkeleton />;
 
   const state = (id: string): Desk => desk[id] ?? "expected";
@@ -70,6 +130,40 @@ export default function ReceptionPage() {
     setDesk((d) => ({ ...d, [id]: "in_consult" }));
     toast.success(`${name} is now with the doctor`);
   }
+  function submitWalkIn(e: React.FormEvent) {
+    e.preventDefault();
+    const typed = walkInPatient.trim().toLowerCase();
+    if (!typed) {
+      toast.error("Enter the patient's name");
+      return;
+    }
+    const patient =
+      data.patients.find((p) => p.name.toLowerCase() === typed) ??
+      data.patients.find((p) => p.name.toLowerCase().startsWith(typed));
+    if (!patient) {
+      toast.error("No patient matches that name — check the spelling");
+      return;
+    }
+    const issued = issueTicket({
+      patientId: patient.id,
+      serviceLabel: service,
+      specialtyId: specialtyId === "any" ? undefined : specialtyId,
+    });
+    if (!issued) return;
+    setWalkInPatient("");
+    const when = new Date(issued.when);
+    toast.success(
+      `${issued.ticket.number} → ${issued.doctorName}, ${
+        issued.sameDay
+          ? when.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
+          : when.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric" }) +
+            " " +
+            when.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
+      } · email sent to ${issued.doctorEmail}`,
+      { duration: 5000 },
+    );
+  }
+
   function complete(id: string, name: string) {
     markStatus(id, "completed");
     setDesk((d) => {
@@ -94,7 +188,195 @@ export default function ReceptionPage() {
         <StatCard index={3} label="Completed" value={String(counts.done)} icon={<CheckCircle2 className="h-4 w-4" />} tone="emerald" />
       </div>
 
-      <Card className="mb-4 mt-6 p-3">
+      {/* --- Walk-in ticketing ------------------------------------------- */}
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
+        <FadeIn>
+          <Card className="p-5">
+            <div className="flex items-center gap-2">
+              <TicketIcon className="h-4 w-4 text-primary" />
+              <h2 className="font-semibold">Issue a walk-in ticket</h2>
+            </div>
+            <p className="mb-4 mt-1 text-sm text-muted-foreground">
+              The platform picks the provider who can see them soonest, books the
+              slot and emails that provider.
+            </p>
+
+            <form onSubmit={submitWalkIn} className="space-y-3">
+              <div>
+                <Label htmlFor="walkin-patient">Patient</Label>
+                <Input
+                  id="walkin-patient"
+                  list="walkin-patient-options"
+                  value={walkInPatient}
+                  onChange={(e) => setWalkInPatient(e.target.value)}
+                  placeholder="Start typing a name…"
+                  autoComplete="off"
+                  className="mt-1"
+                />
+                <datalist id="walkin-patient-options">
+                  {clinicPatients.map((p) => (
+                    <option key={p.id} value={p.name} />
+                  ))}
+                </datalist>
+              </div>
+
+              <div>
+                <Label htmlFor="walkin-service">Reason for the visit</Label>
+                <select
+                  id="walkin-service"
+                  value={service}
+                  onChange={(e) => setService(e.target.value)}
+                  className="mt-1 flex h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {WALK_IN_SERVICES.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <Label htmlFor="walkin-specialty">Specialty needed</Label>
+                <select
+                  id="walkin-specialty"
+                  value={specialtyId}
+                  onChange={(e) => setSpecialtyId(e.target.value)}
+                  className="mt-1 flex h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <option value="any">Any available provider</option>
+                  {clinicSpecialties.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div
+                className="rounded-lg border border-dashed border-border bg-muted/40 px-3 py-2.5 text-sm"
+                data-testid="routing-preview"
+              >
+                {preview ? (
+                  <span className="inline-flex flex-wrap items-center gap-1.5">
+                    <Zap className="h-3.5 w-3.5 shrink-0 text-primary" />
+                    <span className="text-muted-foreground">Will route to</span>
+                    <span className="font-medium">{doctorName(data, preview.doctorId)}</span>
+                    <ArrowRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    <span className="font-medium tabular-nums">
+                      {preview.sameDay
+                        ? `today ${preview.time}`
+                        : `${new Date(preview.iso).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric" })} ${preview.time}`}
+                    </span>
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">
+                    No provider is free in the next 7 days for this specialty.
+                  </span>
+                )}
+              </div>
+
+              <Button type="submit" className="w-full gap-2" disabled={!preview}>
+                <TicketIcon className="h-4 w-4" /> Issue ticket & notify provider
+              </Button>
+            </form>
+          </Card>
+        </FadeIn>
+
+        <FadeIn delay={0.08}>
+          <Card>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-4">
+              <h2 className="font-semibold">Ticket queue</h2>
+              <span className="text-xs text-muted-foreground">
+                {openTickets.length} open · {tickets.length} issued today
+              </span>
+            </div>
+            {tickets.length === 0 ? (
+              <p className="px-5 py-12 text-center text-sm text-muted-foreground">
+                No walk-in tickets yet. Issue one on the left and watch it land on
+                the provider&apos;s calendar.
+              </p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {tickets.slice(0, 12).map((t) => {
+                  const appt = data.appointments.find((a) => a.id === t.appointmentId);
+                  const doctor = data.doctors.find((d) => d.id === t.doctorId);
+                  return (
+                    <li key={t.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
+                      <span className="rounded-md bg-primary/10 px-2 py-1 font-mono text-xs font-semibold text-primary">
+                        {t.number}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">
+                          {patientName(data, t.patientId)}
+                        </p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {t.serviceLabel} · {doctorName(data, t.doctorId)}
+                          {appt &&
+                            ` · ${new Date(appt.start).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`}
+                        </p>
+                        {t.notifiedAt && doctor && (
+                          <p className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-emerald-600">
+                            <Mail className="h-3 w-3" /> Emailed {doctor.email} at{" "}
+                            {new Date(t.notifiedAt).toLocaleTimeString("fr-FR", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </p>
+                        )}
+                      </div>
+                      <span
+                        className={cn(
+                          "rounded-full px-2.5 py-0.5 text-xs font-medium capitalize",
+                          t.status === "routed" && "bg-primary/10 text-primary",
+                          t.status === "in_service" && "bg-sky-500/15 text-sky-600",
+                          t.status === "done" && "bg-emerald-500/15 text-emerald-600",
+                          t.status === "cancelled" && "bg-rose-500/15 text-rose-600",
+                        )}
+                      >
+                        {t.status === "in_service" ? "In service" : t.status}
+                      </span>
+                      {t.status === "routed" && (
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline" onClick={() => setTicketStatus(t.id, "in_service")}>
+                            Start
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-rose-600"
+                            onClick={() => {
+                              setTicketStatus(t.id, "cancelled");
+                              toast(`${t.number} cancelled — the slot is free again`);
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      )}
+                      {t.status === "in_service" && (
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            setTicketStatus(t.id, "done");
+                            toast.success(`${t.number} completed — invoice ready in Billing`);
+                          }}
+                        >
+                          Complete
+                        </Button>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Card>
+        </FadeIn>
+      </div>
+
+      <h2 className="mb-3 mt-8 font-semibold">Today&apos;s appointments</h2>
+
+      <Card className="mb-4 p-3">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input

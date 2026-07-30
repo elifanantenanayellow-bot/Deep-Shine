@@ -14,7 +14,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { formatMoney } from "@/lib/utils";
+import { formatMoney, formatMoneyCompact } from "@/lib/utils";
 
 export const CHART_COLORS = [
   "#6366f1", // indigo
@@ -171,8 +171,9 @@ export function DonutChart({
       <div className="pointer-events-none absolute inset-0 grid place-items-center">
         <div className="text-center">
           <p className="text-xs text-muted-foreground">Total</p>
-          <p className="text-lg font-semibold">
-            {money ? formatMoney(total) : total}
+          {/* Compact inside the ring — a full-precision figure overruns it. */}
+          <p className="text-lg font-semibold tabular-nums">
+            {money ? formatMoneyCompact(total) : total}
           </p>
         </div>
       </div>

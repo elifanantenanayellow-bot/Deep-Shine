@@ -10,21 +10,28 @@ import {
   useState,
 } from "react";
 import { toast } from "sonner";
-import { generateDemoData, PAYMENT_METHODS, DEMO_CLINIC_ID } from "./data";
-import { availableSlots } from "./selectors";
+import {
+  generateDemoData,
+  PAYMENT_METHODS,
+  DEMO_CLINIC_ID,
+  DESK_ID,
+  CLINIC_SITES,
+} from "./data";
+import { availableSlots, routeWalkIn } from "./selectors";
 import type {
   Appointment,
+  CostEntry,
+  CustomerNote,
   DemoData,
   Doctor,
   NotificationItem,
   PaymentMethod,
   PaymentStatus,
+  Ticket,
   WeeklyHours,
 } from "./types";
 
-// Bump the suffix whenever the persisted shape changes — older payloads are
-// ignored and the demo reseeds instead of crashing.
-const STORAGE_KEY = "deepshine-demo-v5";
+import { STORAGE_KEY } from "./storage-key";
 
 // Persisted envelope: data plus the day it was seeded. Data seeded on a
 // previous day decays ("today" drifts out of the busy window), so it is
@@ -89,8 +96,38 @@ interface DemoContextValue {
   pushNotification: (n: Omit<NotificationItem, "id" | "createdAt" | "read">) => void;
   markAllRead: () => void;
   resetDemo: () => void;
+  // --- walk-in ticketing ---
+  // Issues a queue ticket, auto-routes it to whichever provider can see the
+  // person soonest, books the slot and "emails" the provider.
+  issueTicket: (input: {
+    patientId: string;
+    serviceLabel: string;
+    specialtyId?: string;
+    doctorId?: string;
+  }) => IssuedTicket | null;
+  setTicketStatus: (id: string, status: Ticket["status"]) => void;
+  // --- team coordination hub ---
+  sendMessage: (threadId: string, authorId: string, body: string) => void;
+  markThreadRead: (threadId: string) => void;
+  // --- cost tracking ---
+  addCost: (input: Omit<CostEntry, "id" | "clinicId"> & { clinicId?: string }) => void;
+  removeCost: (id: string) => void;
+  // --- manual payment entry ---
+  recordPayment: (appointmentId: string, method: PaymentMethod) => void;
+  // --- customer card notes & follow-ups ---
+  addNote: (input: Omit<CustomerNote, "id" | "createdAt">) => void;
+  toggleFollowUp: (id: string) => void;
+  removeNote: (id: string) => void;
   // derived
   simulatePayment: (method: PaymentMethod) => Promise<PaymentStatus>;
+}
+
+export interface IssuedTicket {
+  ticket: Ticket;
+  doctorName: string;
+  doctorEmail: string;
+  when: string; // ISO of the routed slot
+  sameDay: boolean;
 }
 
 const DemoContext = createContext<DemoContextValue | null>(null);
@@ -106,6 +143,11 @@ const EMPTY: DemoData = {
   records: [],
   prescriptions: [],
   invoices: [],
+  tickets: [],
+  threads: [],
+  messages: [],
+  costs: [],
+  notes: [],
 };
 
 export function DemoProvider({ children }: { children: React.ReactNode }) {
@@ -272,6 +314,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
         name: input.name.startsWith("Dr.") ? input.name : `Dr. ${input.name}`,
         specialtyId: input.specialtyId,
         clinicId: input.clinicId,
+        site: CLINIC_SITES[0],
         avatarHue: Math.floor(Math.random() * 360),
         bio: "Newly added practitioner, ready to see patients.",
         languages: ["Malagasy", "Français"],
@@ -418,6 +461,253 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  // --- Walk-in ticketing --------------------------------------------------
+  // The desk issues a ticket; the platform decides who takes it. Routing runs
+  // against the same availability engine online booking uses, so a ticket can
+  // never land on a provider who is off, on lunch or already booked.
+  const issueTicket = useCallback<DemoContextValue["issueTicket"]>(
+    (input) => {
+      const choice = routeWalkIn(data, DEMO_CLINIC_ID, {
+        specialtyId: input.specialtyId,
+        doctorId: input.doctorId,
+      });
+      if (!choice) {
+        toast.error("No provider has a free slot in the next 7 days");
+        return null;
+      }
+      const doctor = data.doctors.find((x) => x.id === choice.doctorId);
+      const patient = data.patients.find((x) => x.id === input.patientId);
+      if (!doctor || !patient) return null;
+
+      const issuedAt = new Date();
+      const seq = data.tickets.length + 1;
+      const apptId = nextId("ap");
+      const appointment: Appointment = {
+        id: apptId,
+        patientId: patient.id,
+        doctorId: doctor.id,
+        clinicId: doctor.clinicId,
+        specialtyId: doctor.specialtyId,
+        start: choice.iso,
+        durationMin: 30,
+        status: "upcoming",
+        reason: input.serviceLabel,
+        fee: doctor.consultationFee,
+        paymentMethod: null,
+        paymentStatus: "pending",
+        createdAt: issuedAt.toISOString(),
+      };
+      const ticket: Ticket = {
+        id: nextId("tk"),
+        number: `T-${String(seq).padStart(3, "0")}`,
+        clinicId: doctor.clinicId,
+        patientId: patient.id,
+        doctorId: doctor.id,
+        appointmentId: apptId,
+        serviceLabel: input.serviceLabel,
+        issuedAt: issuedAt.toISOString(),
+        status: "routed",
+        // The email goes out with the ticket — that is the whole point of
+        // auto-routing. Simulated here; a real SMTP send in production.
+        notifiedAt: issuedAt.toISOString(),
+      };
+
+      setData((d) => ({
+        ...d,
+        appointments: [appointment, ...d.appointments],
+        tickets: [ticket, ...d.tickets],
+        notifications: [
+          {
+            id: nextId("nt"),
+            kind: "confirmed" as const,
+            title: `Ticket ${ticket.number} routed`,
+            body: `${patient.name} → ${doctor.name} at ${new Date(choice.iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}. Email sent to ${doctor.email}.`,
+            createdAt: issuedAt.toISOString(),
+            read: false,
+          },
+          ...d.notifications,
+        ],
+        // The assigned provider is told in the team hub as well as by email.
+        messages: d.threads.some((t) => t.id === "th-front-desk")
+          ? [
+              ...d.messages,
+              {
+                id: nextId("ms"),
+                threadId: "th-front-desk",
+                authorId: DESK_ID,
+                body: `${ticket.number} — ${patient.name} (${input.serviceLabel}) assigned to ${doctor.name}, ${new Date(choice.iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}.`,
+                createdAt: issuedAt.toISOString(),
+                read: false,
+              },
+            ]
+          : d.messages,
+      }));
+
+      return {
+        ticket,
+        doctorName: doctor.name,
+        doctorEmail: doctor.email,
+        when: choice.iso,
+        sameDay: choice.sameDay,
+      };
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [data],
+  );
+
+  const setTicketStatus = useCallback<DemoContextValue["setTicketStatus"]>(
+    (id, status) => {
+      setData((d) => {
+        const ticket = d.tickets.find((t) => t.id === id);
+        if (!ticket) return d;
+        return {
+          ...d,
+          tickets: d.tickets.map((t) => (t.id === id ? { ...t, status } : t)),
+          // Closing or cancelling a ticket moves the booking with it — the
+          // queue and the calendar must never disagree.
+          appointments: d.appointments.map((a) =>
+            a.id !== ticket.appointmentId
+              ? a
+              : status === "done"
+                ? { ...a, status: "completed" as const }
+                : status === "cancelled"
+                  ? { ...a, status: "cancelled" as const }
+                  : a,
+          ),
+        };
+      });
+    },
+    [],
+  );
+
+  // --- Team coordination hub ----------------------------------------------
+  const sendMessage = useCallback<DemoContextValue["sendMessage"]>(
+    (threadId, authorId, body) => {
+      const text = body.trim();
+      if (!text) return;
+      setData((d) => ({
+        ...d,
+        messages: [
+          ...d.messages,
+          {
+            id: nextId("ms"),
+            threadId,
+            authorId,
+            body: text,
+            createdAt: new Date().toISOString(),
+            read: true, // your own message
+          },
+        ],
+      }));
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  const markThreadRead = useCallback<DemoContextValue["markThreadRead"]>((threadId) => {
+    setData((d) => {
+      if (!d.messages.some((m) => m.threadId === threadId && !m.read)) return d;
+      return {
+        ...d,
+        messages: d.messages.map((m) =>
+          m.threadId === threadId ? { ...m, read: true } : m,
+        ),
+      };
+    });
+  }, []);
+
+  // --- Cost tracking ------------------------------------------------------
+  const addCost = useCallback<DemoContextValue["addCost"]>((input) => {
+    setData((d) => ({
+      ...d,
+      costs: [
+        {
+          ...input,
+          clinicId: input.clinicId ?? DEMO_CLINIC_ID,
+          id: nextId("co"),
+        },
+        ...d.costs,
+      ],
+    }));
+    toast.success("Cost recorded");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const removeCost = useCallback<DemoContextValue["removeCost"]>((id) => {
+    setData((d) => ({ ...d, costs: d.costs.filter((c) => c.id !== id) }));
+  }, []);
+
+  // --- Manual payment entry -----------------------------------------------
+  // Nothing is charged: the desk records money it has already taken, and the
+  // appointment plus its invoice settle together.
+  const recordPayment = useCallback<DemoContextValue["recordPayment"]>(
+    (appointmentId, method) => {
+      setData((d) => {
+        const appt = d.appointments.find((a) => a.id === appointmentId);
+        if (!appt) return d;
+        const alreadyInvoiced = d.invoices.some(
+          (i) => i.appointmentId === appointmentId,
+        );
+        const invoices = alreadyInvoiced
+          ? d.invoices.map((i) =>
+              i.appointmentId === appointmentId
+                ? { ...i, status: "paid" as const, method }
+                : i,
+            )
+          : [
+              {
+                id: nextId("inv"),
+                number: `FA-${new Date().getFullYear()}-${String(d.invoices.length + 1).padStart(4, "0")}`,
+                appointmentId,
+                patientId: appt.patientId,
+                clinicId: appt.clinicId,
+                issuedAt: new Date().toISOString(),
+                amount: appt.fee,
+                status: "paid" as const,
+                method,
+              },
+              ...d.invoices,
+            ];
+        return {
+          ...d,
+          appointments: d.appointments.map((a) =>
+            a.id === appointmentId
+              ? { ...a, paymentStatus: "paid" as const, paymentMethod: method }
+              : a,
+          ),
+          invoices,
+        };
+      });
+      toast.success(`Payment recorded (${method})`);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  // --- Customer card notes & follow-ups -----------------------------------
+  const addNote = useCallback<DemoContextValue["addNote"]>((input) => {
+    setData((d) => ({
+      ...d,
+      notes: [
+        { ...input, id: nextId("cn"), createdAt: new Date().toISOString() },
+        ...d.notes,
+      ],
+    }));
+    toast.success(input.kind === "followup" ? "Follow-up scheduled" : "Note saved");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const toggleFollowUp = useCallback<DemoContextValue["toggleFollowUp"]>((id) => {
+    setData((d) => ({
+      ...d,
+      notes: d.notes.map((n) => (n.id === id ? { ...n, done: !n.done } : n)),
+    }));
+  }, []);
+
+  const removeNote = useCallback<DemoContextValue["removeNote"]>((id) => {
+    setData((d) => ({ ...d, notes: d.notes.filter((n) => n.id !== id) }));
+  }, []);
+
   const resetDemo = useCallback(() => {
     const fresh = generateDemoData(new Date());
     setData(fresh);
@@ -482,6 +772,16 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       pushNotification,
       markAllRead,
       resetDemo,
+      issueTicket,
+      setTicketStatus,
+      sendMessage,
+      markThreadRead,
+      addCost,
+      removeCost,
+      recordPayment,
+      addNote,
+      toggleFollowUp,
+      removeNote,
       simulatePayment,
     }),
     [
@@ -502,6 +802,16 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       pushNotification,
       markAllRead,
       resetDemo,
+      issueTicket,
+      setTicketStatus,
+      sendMessage,
+      markThreadRead,
+      addCost,
+      removeCost,
+      recordPayment,
+      addNote,
+      toggleFollowUp,
+      removeNote,
       simulatePayment,
     ],
   );

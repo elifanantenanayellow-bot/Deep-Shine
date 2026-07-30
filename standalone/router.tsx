@@ -18,12 +18,16 @@ import DoctorLayout from "@/app/(demo)/doctor/layout";
 import DoctorDashboard from "@/app/(demo)/doctor/page";
 import DoctorCalendar from "@/app/(demo)/doctor/calendar/page";
 import DoctorPatients from "@/app/(demo)/doctor/patients/page";
+import DoctorPatientCard from "@/app/(demo)/doctor/patients/[id]/page";
 import DoctorEarnings from "@/app/(demo)/doctor/earnings/page";
 import DoctorAvailability from "@/app/(demo)/doctor/availability/page";
 
 import ClinicLayout from "@/app/(demo)/clinic/layout";
 import ClinicDashboard from "@/app/(demo)/clinic/page";
 import ClinicReception from "@/app/(demo)/clinic/reception/page";
+import ClinicTeamCalendar from "@/app/(demo)/clinic/calendar/page";
+import ClinicMessages from "@/app/(demo)/clinic/messages/page";
+import ClinicCosts from "@/app/(demo)/clinic/costs/page";
 import ClinicAppointments from "@/app/(demo)/clinic/appointments/page";
 import ClinicPatients from "@/app/(demo)/clinic/patients/page";
 import ClinicPatientRecord from "@/app/(demo)/clinic/patients/[id]/page";
@@ -57,11 +61,15 @@ const ROUTES: Route[] = [
   { path: "/doctor", layout: DoctorLayout as Layout, page: DoctorDashboard as Page },
   { path: "/doctor/calendar", layout: DoctorLayout as Layout, page: DoctorCalendar as Page },
   { path: "/doctor/patients", layout: DoctorLayout as Layout, page: DoctorPatients as Page },
+  { path: "/doctor/patients/:id", layout: DoctorLayout as Layout, paramPage: DoctorPatientCard as ParamPage },
   { path: "/doctor/earnings", layout: DoctorLayout as Layout, page: DoctorEarnings as Page },
   { path: "/doctor/availability", layout: DoctorLayout as Layout, page: DoctorAvailability as Page },
 
   { path: "/clinic", layout: ClinicLayout as Layout, page: ClinicDashboard as Page },
   { path: "/clinic/reception", layout: ClinicLayout as Layout, page: ClinicReception as Page },
+  { path: "/clinic/calendar", layout: ClinicLayout as Layout, page: ClinicTeamCalendar as Page },
+  { path: "/clinic/messages", layout: ClinicLayout as Layout, page: ClinicMessages as Page },
+  { path: "/clinic/costs", layout: ClinicLayout as Layout, page: ClinicCosts as Page },
   { path: "/clinic/appointments", layout: ClinicLayout as Layout, page: ClinicAppointments as Page },
   { path: "/clinic/patients", layout: ClinicLayout as Layout, page: ClinicPatients as Page },
   { path: "/clinic/patients/:id", layout: ClinicLayout as Layout, paramPage: ClinicPatientRecord as ParamPage },

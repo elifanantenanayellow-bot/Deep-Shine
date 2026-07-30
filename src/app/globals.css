@@ -59,3 +59,31 @@ body {
     ),
     radial-gradient(50% 50% at 0% 30%, hsl(199 89% 48% / 0.12), transparent 60%);
 }
+
+/* Printing a service summary or prescription: hide the application chrome and
+   put only the document on the page. Signature lines need real ink space. */
+@media print {
+  body {
+    background: #fff;
+    color: #000;
+  }
+  body * {
+    visibility: hidden;
+  }
+  #print-area,
+  #print-area * {
+    visibility: visible;
+  }
+  #print-area {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    max-width: none;
+    border: 0;
+    box-shadow: none;
+    padding: 0;
+  }
+  .no-print {
+    display: none !important;
+  }
+}

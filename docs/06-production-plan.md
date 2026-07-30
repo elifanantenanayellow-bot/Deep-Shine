@@ -378,3 +378,38 @@ estimates assume M1 doesn't uncover deeper foundation defects than F1–F3; if
 it does, the honest move is re-estimating M3, not compressing testing. This
 document should be re-baselined at each gate against what M1's tests actually
 found.
+
+---
+
+## 6. Addendum — clinic operations layer (demo, 2026-07)
+
+Four operational capabilities were added to the demo after the plan above was
+written. They are demo-layer only (in-memory store, `localStorage`); each has a
+production counterpart that is **not** yet built, listed here so the plan stays
+honest about what remains.
+
+| Capability | Demo status | What production still needs |
+|---|---|---|
+| **Walk-in ticketing + auto-routing** | Working. `routeWalkIn()` picks the provider with the earliest genuinely free slot (ties broken by lighter caseload that day), books it, opens a ticket and records the provider notification. | Server-side routing behind the same serializable transaction + exclusion constraint as `createBooking` (M1's F1 fix), so two desks issuing tickets at once cannot collide. Real SMTP delivery with retries and a bounce log — the demo only records `notifiedAt`. |
+| **Shared team calendar** | Working. One column per practitioner across both clinic sites, live against the store. | Server-driven, timezone-correct rendering (M3 timezone work applies directly), and pagination/virtualisation past ~20 columns. |
+| **Team hub (shared inbox)** | Working. Channels + DMs, unread badges, ticket events posted automatically. | Real-time transport (SSE or WebSocket) — the demo re-renders from local state, so two browsers do not see each other. Message retention, moderation and per-tenant storage limits. |
+| **Costs & profit** | Working. Manual cost entry, six-month revenue-vs-cost, margin, category breakdown, CSV export. | Persisted `CostEntry` table with the same `organizationId` scoping as everything else; accountant-grade rounding and a fiscal-period concept rather than calendar months. |
+| **Customer card: notes, follow-ups, service summary** | Working. Preference/care/follow-up notes with authorship, due dates and completion; printable, signable summary. | Follow-ups need the M4 scheduler to actually chase anyone — today they are a list, not a reminder. Clinical notes need audit logging on read as well as write. |
+| **Manual payment entry** | Working. Recording a payment settles the appointment and its invoice together. | Reconciliation against MVola statements (M6) and an immutable payment ledger; the demo mutates the invoice in place. |
+
+### Access control — what is and is not enforced
+
+`/doctor/patients/[id]` refuses to open a record for a patient the signed-in
+practitioner does not treat, and the clinic card names the care team. **This is
+a UI check against client-side state, not authorisation.** In production it
+must be a server-side rule enforced in the same `tenantDb()` seam as tenant
+isolation, with the care-team relationship stored explicitly rather than
+inferred from appointment history. Until then, treat the demo's access panel as
+a design statement, not a security control.
+
+**Classification of the production work above:** the routing transaction and
+server-side record authorisation are **category 1** (critical before the first
+real clinic). Real email delivery for ticket notifications is **category 1**
+— an auto-routed ticket nobody is told about is worse than no routing. Cost
+persistence and real-time messaging transport are **category 3**. Fiscal
+periods and reconciliation are **category 4**.

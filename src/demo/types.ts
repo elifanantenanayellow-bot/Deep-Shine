@@ -28,6 +28,9 @@ export interface Doctor {
   name: string;
   specialtyId: string;
   clinicId: string;
+  // Physical site inside the clinic group — larger practices run more than one
+  // building and the team calendar has to show who is where.
+  site: string;
   avatarHue: number;
   bio: string;
   languages: string[];
@@ -134,6 +137,73 @@ export interface NotificationItem {
   read: boolean;
 }
 
+// --- Walk-in ticketing -----------------------------------------------------
+export type TicketStatus = "routed" | "in_service" | "done" | "cancelled";
+
+export interface Ticket {
+  id: string;
+  number: string; // e.g. "T-042"
+  clinicId: string;
+  patientId: string;
+  doctorId: string; // auto-assigned provider
+  appointmentId: string;
+  serviceLabel: string;
+  issuedAt: string; // ISO
+  status: TicketStatus;
+  notifiedAt: string | null; // when the provider's email went out
+}
+
+// --- Team coordination hub -------------------------------------------------
+export interface Thread {
+  id: string;
+  kind: "channel" | "direct";
+  name: string;
+  participantIds: string[]; // doctor ids ("reception" for the desk)
+  clinicId: string;
+}
+
+export interface Message {
+  id: string;
+  threadId: string;
+  authorId: string;
+  body: string;
+  createdAt: string; // ISO
+  read: boolean;
+}
+
+// --- Cost tracking (cost vs revenue) ---------------------------------------
+export type CostCategory =
+  | "Salaries"
+  | "Rent"
+  | "Supplies"
+  | "Equipment"
+  | "Utilities"
+  | "Marketing"
+  | "Other";
+
+export interface CostEntry {
+  id: string;
+  clinicId: string;
+  date: string; // ISO
+  category: CostCategory;
+  label: string;
+  amount: number;
+}
+
+// --- Customer card: provider notes and follow-ups --------------------------
+export type NoteKind = "preference" | "care" | "followup";
+
+export interface CustomerNote {
+  id: string;
+  patientId: string;
+  authorId: string; // doctor id — only the author's clinic sees it
+  kind: NoteKind;
+  body: string;
+  createdAt: string; // ISO
+  dueAt?: string; // follow-ups only
+  done?: boolean; // follow-ups only
+}
+
 export interface DemoData {
   specialties: Specialty[];
   clinics: Clinic[];
@@ -145,4 +215,9 @@ export interface DemoData {
   records: MedicalRecord[];
   prescriptions: Prescription[];
   invoices: Invoice[];
+  tickets: Ticket[];
+  threads: Thread[];
+  messages: Message[];
+  costs: CostEntry[];
+  notes: CustomerNote[];
 }

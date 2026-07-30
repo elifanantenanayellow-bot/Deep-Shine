@@ -13,6 +13,8 @@ export interface PortalNavItem {
   href: string;
   label: string;
   icon: React.ReactNode;
+  // Unread counter rendered as a badge (team hub messages, for example).
+  badge?: number;
 }
 
 export function PortalShell({
@@ -69,7 +71,12 @@ export function PortalShell({
             )}
           >
             <span className="shrink-0">{item.icon}</span>
-            {item.label}
+            <span className="flex-1">{item.label}</span>
+            {item.badge != null && item.badge > 0 && (
+              <span className="grid h-5 min-w-[20px] place-items-center rounded-full bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground">
+                {item.badge}
+              </span>
+            )}
           </Link>
         ))}
       </nav>

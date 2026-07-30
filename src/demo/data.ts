@@ -5,17 +5,22 @@ import type {
   Appointment,
   AppointmentStatus,
   Clinic,
+  CostCategory,
+  CostEntry,
+  CustomerNote,
   DemoData,
   Doctor,
   DoctorSchedule,
   Invoice,
   MedicalRecord,
+  Message,
   NotificationItem,
   Prescription,
   Patient,
   PaymentMethod,
   PaymentStatus,
   Specialty,
+  Thread,
 } from "./types";
 
 // --- seeded PRNG (mulberry32) so data is stable within a session build ---
@@ -50,6 +55,13 @@ const CLINICS: Clinic[] = [
   { id: "cl-5", name: "Clinique Mahasoa", city: "Mahajanga", address: "Rue de la Corniche", phone: "+261 34 12 345 05" },
   { id: "cl-6", name: "Espace Médical Fianar", city: "Fianarantsoa", address: "Ampasambazaha", phone: "+261 34 12 345 06" },
 ];
+
+// The clinic-admin portal is scoped to this tenant (Centre Médical Antananarivo).
+const DEMO_CLINIC_ID_VALUE = "cl-1";
+// The front desk is a participant in the team hub but is not a practitioner.
+const RECEPTION_ID = "reception";
+// The flagship clinic operates out of two buildings.
+const FLAGSHIP_SITES = ["Analakely (main)", "Isoraka (annex)"];
 
 const FIRST_M = ["Andry", "Hery", "Lova", "Naina", "Tiana", "Fanja", "Rado", "Mamy", "Faly", "Toky", "Ny Aina", "Setra", "Fetra", "Haja", "Rija", "Iando", "Miora", "Onja"];
 const FIRST_F = ["Fara", "Voahangy", "Hanta", "Soa", "Lalao", "Ravaka", "Tahina", "Ony", "Sitraka", "Domoina", "Malala", "Vola", "Hasina", "Nirina", "Fitia", "Anja", "Sarobidy", "Hasimbola"];
@@ -98,11 +110,19 @@ export function generateDemoData(now: Date): DemoData {
     // Centre Médical Antananarivo (cl-1) is the flagship demo clinic: 8 of 20 doctors
     // work there (including dr-1) so its scoped portal looks busy.
     const clinic = i < 8 ? CLINICS[0] : pick(rng, CLINICS.slice(1));
+    // The flagship runs two buildings; everyone else is single-site.
+    const site =
+      clinic.id === DEMO_CLINIC_ID_VALUE
+        ? i % 3 === 2
+          ? FLAGSHIP_SITES[1]
+          : FLAGSHIP_SITES[0]
+        : clinic.city;
     doctors.push({
       id: `dr-${i + 1}`,
       name,
       specialtyId: specialty.id,
       clinicId: clinic.id,
+      site,
       avatarHue: Math.floor(rng() * 360),
       bio: `${name.split(" ")[1]} is a ${specialty.name.toLowerCase()} specialist with a patient-first approach, combining modern techniques with compassionate care.`,
       languages: rng() > 0.5 ? ["Malagasy", "Français", "English"] : ["Malagasy", "Français"],
@@ -136,24 +156,40 @@ export function generateDemoData(now: Date): DemoData {
     });
   }
 
-  // Appointments — spread across last 60 days and next 21 days, generated
-  // per doctor so every practitioner has a believable schedule. Flagship
-  // (cl-1) doctors see 1–2 patients/weekday; others are occasional.
+  // Appointments — the recent 60 days and the next 21 at full density, plus a
+  // thinner tail back to -180 days for the flagship clinic only. That tail is
+  // what makes six months of revenue-versus-cost history real instead of a
+  // run of empty months; the -60…+21 window is untouched, so every "today",
+  // "this week" and 30/60-day comparison behaves exactly as before.
+  const HISTORY_DAYS = 180;
+  const DENSE_DAYS = 60;
   const methods: PaymentMethod[] = ["MVola", "Orange Money", "Airtel Money", "Credit Card"];
   const appointments: Appointment[] = [];
   let counter = 1;
-  for (let d = -60; d <= 21; d++) {
+  for (let d = -HISTORY_DAYS; d <= 21; d++) {
     const day = new Date(now);
     day.setDate(day.getDate() + d);
     const weekday = day.getDay();
     if (weekday === 0) continue; // clinics closed Sunday
     const saturday = weekday === 6;
+    const tail = d < -DENSE_DAYS;
     const dayLoad: { doctor: Doctor }[] = [];
     for (const doctor of doctors) {
-      const flagship = doctor.clinicId === "cl-1";
+      const flagship = doctor.clinicId === DEMO_CLINIC_ID_VALUE;
+      // Older history is flagship-only and lighter — enough for a truthful
+      // trend line without doubling the size of the persisted payload.
+      if (tail && !flagship) continue;
       let count: number;
       if (flagship) {
-        count = saturday ? (rng() > 0.5 ? 1 : 0) : 1 + Math.floor(rng() * 2);
+        count = tail
+          ? rng() < (saturday ? 0.2 : 0.55)
+            ? 1
+            : 0
+          : saturday
+            ? rng() > 0.5
+              ? 1
+              : 0
+            : 1 + Math.floor(rng() * 2);
       } else {
         count = rng() < (saturday ? 0.15 : 0.35) ? 1 : 0;
       }
@@ -180,11 +216,21 @@ export function generateDemoData(now: Date): DemoData {
         const r = rng();
         status = r < 0.78 ? "completed" : r < 0.9 ? "cancelled" : "no_show";
         if (status === "completed") {
-          // Real clinics carry receivables: most visits are settled, some
-          // are still owed, a few failed. A billing screen that always
-          // reads "0 outstanding" is not a billing screen.
+          // Real clinics carry receivables: most recent visits are settled,
+          // some are still owed, a few failed. A billing screen that always
+          // reads "0 outstanding" is not a billing screen. Old debt, though,
+          // has long since been collected or written off — leaving half-year-
+          // old invoices "overdue" would misstate what the clinic is chasing.
           const pr = rng();
-          paymentStatus = pr < 0.8 ? "paid" : pr < 0.94 ? "pending" : "failed";
+          paymentStatus = tail
+            ? pr < 0.97
+              ? "paid"
+              : "failed"
+            : pr < 0.8
+              ? "paid"
+              : pr < 0.94
+                ? "pending"
+                : "failed";
         } else if (status === "cancelled") {
           paymentStatus = rng() > 0.5 ? "failed" : "paid";
         } else {
@@ -384,6 +430,162 @@ export function generateDemoData(now: Date): DemoData {
     },
   ];
 
+  // --- Operating costs (last 6 months, flagship clinic) -------------------
+  // Cost vs. revenue only means something with a real cost base behind it, so
+  // the recurring lines a clinic actually pays are seeded month by month.
+  const costs: CostEntry[] = [];
+  let costSeq = 1;
+  for (let m = 5; m >= 0; m--) {
+    const from = new Date(now.getFullYear(), now.getMonth() - m, 1);
+    const to = new Date(now.getFullYear(), now.getMonth() - m + 1, 1);
+    const monthRevenue = appointments
+      .filter(
+        (a) =>
+          a.clinicId === DEMO_CLINIC_ID_VALUE &&
+          a.paymentStatus === "paid" &&
+          new Date(a.start) >= from &&
+          new Date(a.start) < to,
+      )
+      .reduce((s, a) => s + a.fee, 0);
+    // A month the clinic barely traded in gets no cost lines — inventing them
+    // would show a loss that never happened.
+    if (monthRevenue < 1_000_000) continue;
+
+    const posted = new Date(now.getFullYear(), now.getMonth() - m, 5);
+    // Rent and utilities barely move; payroll, consumables and advertising
+    // scale with how busy the clinic was. Target margin lands around 32–42%.
+    const rent = round(1_150_000 * (0.97 + rng() * 0.08), 5000);
+    const utilities = round(310_000 * (0.9 + rng() * 0.25), 5000);
+    const variable = Math.max(
+      0,
+      monthRevenue * (0.58 + rng() * 0.1) - rent - utilities,
+    );
+    const lines: { category: CostCategory; label: string; amount: number }[] = [
+      { category: "Salaries", label: "Staff payroll", amount: round(variable * 0.78, 5000) },
+      { category: "Rent", label: "Premises rent", amount: rent },
+      { category: "Utilities", label: "Electricity & water (JIRAMA)", amount: utilities },
+      { category: "Supplies", label: "Medical consumables", amount: round(variable * 0.15, 5000) },
+      { category: "Marketing", label: "Facebook ads & flyers", amount: round(variable * 0.07, 5000) },
+    ];
+    for (const line of lines) {
+      if (line.amount <= 0) continue;
+      costs.push({
+        id: `co-${costSeq++}`,
+        clinicId: DEMO_CLINIC_ID_VALUE,
+        date: posted.toISOString(),
+        ...line,
+      });
+    }
+
+    // Equipment is lumpy — it lands in some months and not others.
+    if (rng() > 0.6) {
+      const equip = new Date(now.getFullYear(), now.getMonth() - m, 12 + Math.floor(rng() * 10));
+      costs.push({
+        id: `co-${costSeq++}`,
+        clinicId: DEMO_CLINIC_ID_VALUE,
+        date: equip.toISOString(),
+        category: "Equipment",
+        label: pick(rng, [
+          "Autoclave maintenance",
+          "Dental chair repair",
+          "ECG electrodes",
+          "Sterilisation unit",
+          "Waiting-room furniture",
+        ]),
+        amount: round(200_000 + rng() * 900_000, 10000),
+      });
+    }
+  }
+
+  // --- Team coordination hub ----------------------------------------------
+  const flagshipDoctors = doctors.filter((d) => d.clinicId === DEMO_CLINIC_ID_VALUE);
+  const threads: Thread[] = [
+    {
+      id: "th-front-desk",
+      kind: "channel",
+      name: "Front desk",
+      participantIds: [RECEPTION_ID, ...flagshipDoctors.map((d) => d.id)],
+      clinicId: DEMO_CLINIC_ID_VALUE,
+    },
+    {
+      id: "th-clinical",
+      kind: "channel",
+      name: "Clinical team",
+      participantIds: flagshipDoctors.map((d) => d.id),
+      clinicId: DEMO_CLINIC_ID_VALUE,
+    },
+    ...flagshipDoctors.slice(0, 3).map((d) => ({
+      id: `th-dm-${d.id}`,
+      kind: "direct" as const,
+      name: d.name,
+      participantIds: [RECEPTION_ID, d.id],
+      clinicId: DEMO_CLINIC_ID_VALUE,
+    })),
+  ];
+
+  const SEEDED_MESSAGES: [string, string, string, number][] = [
+    ["th-front-desk", RECEPTION_ID, "Bonjour team — 3 walk-ins already waiting, I'm routing them now.", 190],
+    ["th-front-desk", flagshipDoctors[0]?.id ?? RECEPTION_ID, "Noted. I can take two before 10:00.", 176],
+    ["th-front-desk", flagshipDoctors[1]?.id ?? RECEPTION_ID, "Running 15 min late, road blocked at Analakely.", 145],
+    ["th-front-desk", RECEPTION_ID, "No problem, I'll tell your 09:30 patient.", 141],
+    ["th-clinical", flagshipDoctors[2]?.id ?? RECEPTION_ID, "Autoclave cycle finished — instruments ready in room 2.", 98],
+    ["th-clinical", flagshipDoctors[0]?.id ?? RECEPTION_ID, "Thanks. Anyone free to cover the 14:00 follow-up?", 62],
+    ["th-clinical", flagshipDoctors[1]?.id ?? RECEPTION_ID, "I can take it.", 55],
+    [`th-dm-${flagshipDoctors[0]?.id ?? "dr-1"}`, RECEPTION_ID, "Your next patient asked to move to Thursday — OK?", 34],
+    [`th-dm-${flagshipDoctors[0]?.id ?? "dr-1"}`, flagshipDoctors[0]?.id ?? RECEPTION_ID, "Yes, Thursday morning works.", 28],
+    [`th-dm-${flagshipDoctors[1]?.id ?? "dr-2"}`, flagshipDoctors[1]?.id ?? RECEPTION_ID, "Can you print the consent form for my 11:00?", 24],
+    [`th-dm-${flagshipDoctors[1]?.id ?? "dr-2"}`, RECEPTION_ID, "Done, it's on your desk.", 21],
+    [`th-dm-${flagshipDoctors[2]?.id ?? "dr-3"}`, RECEPTION_ID, "Isoraka is quiet this morning — send anything my way.", 17],
+    ["th-front-desk", RECEPTION_ID, "Reminder: stock check for gloves and masks this afternoon.", 12],
+  ];
+  const messages: Message[] = SEEDED_MESSAGES.map(([threadId, authorId, body, minsAgo], i) => ({
+    id: `ms-${i + 1}`,
+    threadId,
+    authorId,
+    body,
+    createdAt: new Date(now.getTime() - minsAgo * 60_000).toISOString(),
+    // The last message in each channel stays unread so the inbox has a badge.
+    read: minsAgo > 40,
+  }));
+
+  // --- Provider notes on the customer card --------------------------------
+  const NOTE_SEEDS: [CustomerNote["kind"], string][] = [
+    ["preference", "Prefers morning appointments, before 10:00."],
+    ["preference", "Speaks Malagasy only — avoid French-language instructions."],
+    ["preference", "Anxious about injections; allow extra time."],
+    ["care", "Rinse with warm salt water twice daily for one week."],
+    ["care", "Avoid hard foods on the left side for 48 hours."],
+    ["care", "Blood pressure to be re-checked at every visit."],
+    ["followup", "Call to confirm the treatment is working."],
+    ["followup", "Schedule the second session of the treatment plan."],
+    ["followup", "Review lab results with the patient."],
+  ];
+  const notes: CustomerNote[] = [];
+  let noteSeq = 1;
+  const seenPatients = new Set<string>();
+  for (const appt of appointments) {
+    if (appt.clinicId !== DEMO_CLINIC_ID_VALUE || appt.status !== "completed") continue;
+    if (seenPatients.has(appt.patientId) || rng() > 0.45) continue;
+    seenPatients.add(appt.patientId);
+    const [kind, body] = pick(rng, NOTE_SEEDS);
+    const created = new Date(appt.start);
+    const note: CustomerNote = {
+      id: `cn-${noteSeq++}`,
+      patientId: appt.patientId,
+      authorId: appt.doctorId,
+      kind,
+      body,
+      createdAt: created.toISOString(),
+    };
+    if (kind === "followup") {
+      const due = new Date(created);
+      due.setDate(due.getDate() + 7 + Math.floor(rng() * 45));
+      note.dueAt = due.toISOString();
+      note.done = rng() > 0.6;
+    }
+    notes.push(note);
+  }
+
   return {
     specialties: SPECIALTIES,
     clinics: CLINICS,
@@ -395,11 +597,26 @@ export function generateDemoData(now: Date): DemoData {
     records,
     prescriptions,
     invoices,
+    tickets: [],
+    threads,
+    messages,
+    costs,
+    notes,
   };
 }
 
 export const SPECIALTY_LIST = SPECIALTIES;
 export const CLINIC_LIST = CLINICS;
-// The clinic-admin portal is scoped to this tenant (Clinique Sourire).
-export const DEMO_CLINIC_ID = "cl-1";
+export const DEMO_CLINIC_ID = DEMO_CLINIC_ID_VALUE;
+export const DESK_ID = RECEPTION_ID;
+export const CLINIC_SITES = FLAGSHIP_SITES;
+export const COST_CATEGORIES: CostCategory[] = [
+  "Salaries",
+  "Rent",
+  "Supplies",
+  "Equipment",
+  "Utilities",
+  "Marketing",
+  "Other",
+];
 export const PAYMENT_METHODS: PaymentMethod[] = ["MVola", "Orange Money", "Airtel Money", "Credit Card"];
