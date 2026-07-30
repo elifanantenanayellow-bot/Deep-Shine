@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   CalendarDays,
@@ -10,6 +10,7 @@ import {
   Users,
   Clock,
   CircleDot,
+  Search,
 } from "lucide-react";
 import { useDemo } from "@/demo/store";
 import { DEMO_CLINIC_ID } from "@/demo/data";
@@ -17,7 +18,7 @@ import { isSameDay, patientName, specialtyName } from "@/demo/selectors";
 import { PageTitle, DashboardSkeleton } from "@/components/demo/portal-shell";
 import { Avatar, EmptyState } from "@/components/demo/primitives";
 import { FadeIn } from "@/components/demo/motion";
-import { Button, Card } from "@/components/ui";
+import { Button, Card, Input } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 // The shared team calendar: one column per practitioner, one row per half
@@ -38,6 +39,7 @@ export default function TeamCalendarPage() {
   const { ready, data } = useDemo();
   const [offset, setOffset] = useState(0);
   const [site, setSite] = useState<string>("all");
+  const [query, setQuery] = useState("");
 
   const day = useMemo(() => {
     const d = new Date();
@@ -45,6 +47,21 @@ export default function TeamCalendarPage() {
     d.setDate(d.getDate() + offset);
     return d;
   }, [offset]);
+
+  // ←/→ step the day, so a receptionist can walk the week from the keyboard
+  // without reaching for the mouse. Ignored while typing in the filter.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      const tag = el?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || el?.isContentEditable) return;
+      if (e.key === "ArrowLeft") setOffset((o) => o - 1);
+      else if (e.key === "ArrowRight") setOffset((o) => o + 1);
+      else if (e.key === "Home") setOffset(0);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const team = useMemo(
     () => data.doctors.filter((d) => d.clinicId === DEMO_CLINIC_ID),
@@ -56,10 +73,12 @@ export default function TeamCalendarPage() {
     [team],
   );
 
-  const columns = useMemo(
-    () => (site === "all" ? team : team.filter((d) => d.site === site)),
-    [team, site],
-  );
+  const columns = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return team
+      .filter((d) => site === "all" || d.site === site)
+      .filter((d) => !q || d.name.toLowerCase().includes(q));
+  }, [team, site, query]);
 
   const dayAppointments = useMemo(
     () =>
@@ -135,7 +154,17 @@ export default function TeamCalendarPage() {
           {capacity > 0 && ` · ${Math.round((booked / capacity) * 100)}% full`}
         </span>
 
-        <div className="ml-auto flex flex-wrap gap-1.5">
+        <div className="relative ml-auto w-full sm:w-52">
+          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Filter providers…"
+            aria-label="Filter providers"
+            className="h-9 pl-8 text-sm"
+          />
+        </div>
+        <div className="flex flex-wrap gap-1.5">
           <SiteChip label="All sites" active={site === "all"} onClick={() => setSite("all")} />
           {sites.map((s) => (
             <SiteChip key={s} label={s} active={site === s} onClick={() => setSite(s)} />
@@ -146,8 +175,12 @@ export default function TeamCalendarPage() {
       {columns.length === 0 ? (
         <EmptyState
           icon={<Users className="h-8 w-8" />}
-          title="No practitioners at this site"
-          description="Choose another site to see its team."
+          title={query ? "No provider matches your filter" : "No practitioners at this site"}
+          description={
+            query
+              ? "Clear the search to see the whole team."
+              : "Choose another site to see its team."
+          }
         />
       ) : (
         <FadeIn>

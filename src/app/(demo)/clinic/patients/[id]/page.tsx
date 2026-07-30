@@ -17,9 +17,9 @@ import {
   FileSignature,
 } from "lucide-react";
 import { useDemo } from "@/demo/store";
-import { doctorName, specialtyName } from "@/demo/selectors";
+import { doctorName, specialtyName, careTeam } from "@/demo/selectors";
 import { DashboardSkeleton } from "@/components/demo/portal-shell";
-import { Avatar, EmptyState, StatusPill } from "@/components/demo/primitives";
+import { Avatar, EmptyState, MetricTile, StatusPill } from "@/components/demo/primitives";
 import { FadeIn } from "@/components/demo/motion";
 import { Button, Card } from "@/components/ui";
 import { formatMoney, formatMoneyCompact, cn } from "@/lib/utils";
@@ -63,14 +63,7 @@ export default function PatientRecordPage({
   );
   // The care team: providers who have actually treated this person. Clinical
   // notes are theirs — nobody outside it reads or writes them.
-  const careTeam = useMemo(() => {
-    const ids = new Set(
-      data.appointments
-        .filter((a) => a.patientId === id && a.status !== "cancelled")
-        .map((a) => a.doctorId),
-    );
-    return data.doctors.filter((d) => ids.has(d.id));
-  }, [data.appointments, data.doctors, id]);
+  const team = useMemo(() => careTeam(data, id), [data, id]);
 
   if (!ready) return <DashboardSkeleton />;
   if (!patient) {
@@ -133,10 +126,10 @@ export default function PatientRecordPage({
           <div className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-muted/60 px-3 py-2 text-xs">
             <Lock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
             <span className="text-muted-foreground">Clinical access restricted to the care team:</span>
-            {careTeam.length === 0 ? (
+            {team.length === 0 ? (
               <span className="font-medium">no provider assigned yet</span>
             ) : (
-              careTeam.map((d) => (
+              team.map((d) => (
                 <span key={d.id} className="rounded-full bg-card px-2 py-0.5 font-medium">
                   {d.name}
                 </span>
@@ -145,10 +138,10 @@ export default function PatientRecordPage({
           </div>
 
           <div className="mt-6 grid grid-cols-2 gap-3 border-t border-border pt-5 sm:grid-cols-4">
-            <Metric label="Visits" value={String(appointments.filter((a) => a.status === "completed").length)} />
-            <Metric label="Upcoming" value={String(appointments.filter((a) => a.status === "upcoming").length)} />
-            <Metric label="Total billed" value={formatMoneyCompact(paid)} />
-            <Metric label="Prescriptions" value={String(prescriptions.length)} />
+            <MetricTile label="Visits" value={String(appointments.filter((a) => a.status === "completed").length)} />
+            <MetricTile label="Upcoming" value={String(appointments.filter((a) => a.status === "upcoming").length)} />
+            <MetricTile label="Total billed" value={formatMoneyCompact(paid)} />
+            <MetricTile label="Prescriptions" value={String(prescriptions.length)} />
           </div>
         </Card>
       </FadeIn>
@@ -158,8 +151,8 @@ export default function PatientRecordPage({
           {/* Provider notes, preferences and follow-ups */}
           <ProviderNotes
             patientId={patient.id}
-            authorId={careTeam[0]?.id ?? data.doctors[0]?.id ?? "dr-1"}
-            visibleAuthorIds={careTeam.map((d) => d.id)}
+            authorId={team[0]?.id ?? data.doctors[0]?.id ?? "dr-1"}
+            visibleAuthorIds={team.map((d) => d.id)}
           />
 
           {/* Medical records */}
@@ -316,15 +309,6 @@ export default function PatientRecordPage({
         patient={patient}
       />
     </>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg bg-muted/60 p-3 text-center">
-      <p className="text-lg font-semibold">{value}</p>
-      <p className="text-[11px] uppercase text-muted-foreground">{label}</p>
-    </div>
   );
 }
 

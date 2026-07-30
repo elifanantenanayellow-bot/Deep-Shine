@@ -13,9 +13,9 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { useDemo } from "@/demo/store";
-import { doctorName, specialtyName } from "@/demo/selectors";
+import { doctorName, specialtyName, careTeam } from "@/demo/selectors";
 import { DashboardSkeleton } from "@/components/demo/portal-shell";
-import { Avatar, EmptyState, StatusPill } from "@/components/demo/primitives";
+import { Avatar, EmptyState, MetricTile, StatusPill } from "@/components/demo/primitives";
 import { FadeIn } from "@/components/demo/motion";
 import { ProviderNotes } from "@/components/demo/provider-notes";
 import { ServiceSummary } from "@/components/demo/service-summary";
@@ -45,14 +45,7 @@ export default function DoctorPatientCard({
     [data.appointments, id, currentDoctorId],
   );
 
-  const careTeam = useMemo(() => {
-    const ids = new Set(
-      data.appointments
-        .filter((a) => a.patientId === id && a.status !== "cancelled")
-        .map((a) => a.doctorId),
-    );
-    return data.doctors.filter((d) => ids.has(d.id));
-  }, [data.appointments, data.doctors, id]);
+  const team = useMemo(() => careTeam(data, id), [data, id]);
 
   if (!ready) return <DashboardSkeleton />;
 
@@ -87,7 +80,7 @@ export default function DoctorPatientCard({
           <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
             You are not on {patient.name}&apos;s care team, so their record is not
             visible to you. Records open only to the providers who treat the
-            patient — {careTeam.length > 0 ? careTeam.map((d) => d.name).join(", ") : "no provider is assigned yet"}.
+            patient — {team.length > 0 ? team.map((d) => d.name).join(", ") : "no provider is assigned yet"}.
           </p>
           <Link href="/doctor/patients" className="mt-5 inline-block">
             <Button variant="outline">Back to my patients</Button>
@@ -149,10 +142,10 @@ export default function DoctorPatientCard({
           </div>
 
           <div className="mt-5 grid grid-cols-2 gap-3 border-t border-border pt-5 sm:grid-cols-4">
-            <Metric label="Visits with you" value={String(mine.filter((a) => a.status === "completed").length)} />
-            <Metric label="Upcoming" value={String(mine.filter((a) => a.status === "upcoming").length)} />
-            <Metric label="Paid to you" value={formatMoneyCompact(paid)} />
-            <Metric label="Your records" value={String(myRecords.length)} />
+            <MetricTile label="Visits with you" value={String(mine.filter((a) => a.status === "completed").length)} />
+            <MetricTile label="Upcoming" value={String(mine.filter((a) => a.status === "upcoming").length)} />
+            <MetricTile label="Paid to you" value={formatMoneyCompact(paid)} />
+            <MetricTile label="Your records" value={String(myRecords.length)} />
           </div>
         </Card>
       </FadeIn>
@@ -207,11 +200,3 @@ export default function DoctorPatientCard({
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg bg-muted/60 p-3 text-center">
-      <p className="text-lg font-semibold">{value}</p>
-      <p className="text-[11px] uppercase text-muted-foreground">{label}</p>
-    </div>
-  );
-}

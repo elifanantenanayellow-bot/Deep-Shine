@@ -102,6 +102,19 @@ export function PaymentPill({ status }: { status: PaymentStatus }) {
   );
 }
 
+// A compact figure tile used on record headers (visits, upcoming, billed…).
+// Extracted so the clinic and doctor customer cards render it identically.
+export function MetricTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg bg-muted/60 p-3 text-center">
+      <p className="text-lg font-semibold tabular-nums">{value}</p>
+      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+    </div>
+  );
+}
+
 export function EmptyState({
   icon,
   title,

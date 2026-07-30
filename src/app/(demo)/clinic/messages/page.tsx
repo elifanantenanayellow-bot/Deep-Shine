@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Hash, Send, MessageSquare, Users, MapPin } from "lucide-react";
+import { Hash, Send, MessageSquare, Users, MapPin, Search, Check } from "lucide-react";
 import { useDemo } from "@/demo/store";
 import { DEMO_CLINIC_ID, DESK_ID } from "@/demo/data";
 import { PageTitle, DashboardSkeleton } from "@/components/demo/portal-shell";
 import { Avatar, EmptyState } from "@/components/demo/primitives";
 import { Button, Card, Input } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import type { Message } from "@/demo/types";
 
 // The team hub. Thread list on the left, the live conversation in the
 // centre-right where the eye lands — the same place staff will be looking
@@ -26,6 +27,7 @@ export default function MessagesPage() {
   const { ready, data, sendMessage, markThreadRead } = useDemo();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  const [threadQuery, setThreadQuery] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
 
   const threads = useMemo(
@@ -33,17 +35,41 @@ export default function MessagesPage() {
     [data.threads],
   );
 
-  const active = activeId
-    ? (threads.find((t) => t.id === activeId) ?? threads[0])
-    : threads[0];
+  // Index every message by thread ONCE (sorted oldest→newest), then derive the
+  // last message and unread count per thread from it. The previous code scanned
+  // all messages twice per rendered thread row — O(threads × messages); this is
+  // O(messages) regardless of how many threads exist.
+  const byThread = useMemo(() => {
+    const map = new Map<string, { messages: Message[]; unread: number }>();
+    for (const t of threads) map.set(t.id, { messages: [], unread: 0 });
+    for (const m of data.messages) {
+      const entry = map.get(m.threadId);
+      if (!entry) continue;
+      entry.messages.push(m);
+      if (!m.read) entry.unread += 1;
+    }
+    for (const entry of map.values()) {
+      entry.messages.sort((a, b) => +new Date(a.createdAt) - +new Date(b.createdAt));
+    }
+    return map;
+  }, [threads, data.messages]);
 
-  const conversation = useMemo(
-    () =>
-      data.messages
-        .filter((m) => m.threadId === active?.id)
-        .sort((a, b) => +new Date(a.createdAt) - +new Date(b.createdAt)),
-    [data.messages, active?.id],
-  );
+  const visibleThreads = useMemo(() => {
+    const q = threadQuery.trim().toLowerCase();
+    if (!q) return threads;
+    return threads.filter((t) => {
+      const last = byThread.get(t.id)?.messages.at(-1)?.body ?? "";
+      return t.name.toLowerCase().includes(q) || last.toLowerCase().includes(q);
+    });
+  }, [threads, threadQuery, byThread]);
+
+  // Keep the selected thread valid even when a search hides it.
+  const active =
+    (activeId && threads.find((t) => t.id === activeId)) ||
+    visibleThreads[0] ||
+    threads[0];
+
+  const conversation = active ? (byThread.get(active.id)?.messages ?? []) : [];
 
   // Opening a thread clears its badge, and new messages scroll into view.
   const activeThreadId = active?.id;
@@ -57,12 +83,10 @@ export default function MessagesPage() {
 
   if (!ready) return <DashboardSkeleton />;
 
-  const unreadFor = (threadId: string) =>
-    data.messages.filter((m) => m.threadId === threadId && !m.read).length;
+  const unreadFor = (threadId: string) => byThread.get(threadId)?.unread ?? 0;
 
-  const totalUnread = data.messages.filter(
-    (m) => !m.read && threads.some((t) => t.id === m.threadId),
-  ).length;
+  let totalUnread = 0;
+  for (const entry of byThread.values()) totalUnread += entry.unread;
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -92,15 +116,27 @@ export default function MessagesPage() {
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
           {/* Thread list */}
           <Card className="h-fit overflow-hidden">
-            <p className="border-b border-border px-4 py-3 text-[11px] uppercase text-muted-foreground">
-              Conversations
-            </p>
+            <div className="border-b border-border p-2">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={threadQuery}
+                  onChange={(e) => setThreadQuery(e.target.value)}
+                  placeholder="Search conversations…"
+                  aria-label="Search conversations"
+                  className="h-9 pl-8 text-sm"
+                />
+              </div>
+            </div>
+            {visibleThreads.length === 0 ? (
+              <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+                No conversation matches “{threadQuery}”.
+              </p>
+            ) : (
             <ul className="divide-y divide-border">
-              {threads.map((t) => {
+              {visibleThreads.map((t) => {
                 const unread = unreadFor(t.id);
-                const last = data.messages
-                  .filter((m) => m.threadId === t.id)
-                  .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))[0];
+                const last = byThread.get(t.id)?.messages.at(-1);
                 const selected = active?.id === t.id;
                 return (
                   <li key={t.id}>
@@ -139,6 +175,7 @@ export default function MessagesPage() {
                 );
               })}
             </ul>
+            )}
           </Card>
 
           {/* Conversation — centre-right */}
@@ -198,6 +235,11 @@ export default function MessagesPage() {
                           >
                             {m.body}
                           </p>
+                          {mine && (
+                            <span className="mt-0.5 flex items-center justify-end gap-0.5 text-[10px] text-muted-foreground">
+                              <Check className="h-3 w-3" /> Sent
+                            </span>
+                          )}
                         </div>
                       </div>
                     );

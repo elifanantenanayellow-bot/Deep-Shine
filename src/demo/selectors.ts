@@ -25,6 +25,21 @@ export function clinicName(data: DemoData, id: string): string {
   return data.clinics.find((c) => c.id === id)?.name ?? "Clinic";
 }
 
+// The providers who have actually treated a patient (any non-cancelled
+// appointment). This is the demo's notion of a "care team": clinical notes and
+// the customer card open only to these providers. Extracted here so the clinic
+// and doctor record pages compute it identically — the access rule must not
+// drift between the two surfaces. In production this becomes an explicit,
+// server-enforced relationship rather than one inferred from history.
+export function careTeam(data: DemoData, patientId: string): Doctor[] {
+  const ids = new Set(
+    data.appointments
+      .filter((a) => a.patientId === patientId && a.status !== "cancelled")
+      .map((a) => a.doctorId),
+  );
+  return data.doctors.filter((d) => ids.has(d.id));
+}
+
 export function isSameDay(a: Date, b: Date): boolean {
   return (
     a.getFullYear() === b.getFullYear() &&
@@ -265,15 +280,59 @@ export function nextFreeSlot(
 }
 
 // --- Walk-in auto-routing ---------------------------------------------------
-// Picks the provider a walk-in should go to: whoever can see them soonest.
-// Ties (two providers free at the same time) go to the lighter caseload that
-// day, so the queue spreads across the team instead of piling on one person.
+// Chooses the provider a walk-in ticket should go to.
+//
+// ALGORITHM ("earliest slot, fairest tie-break")
+//   1. Build the eligible pool: providers at this clinic, optionally narrowed
+//      to one specialty or one named provider.
+//   2. Scan forward day by day (today … +6). The first day on which ANY
+//      eligible provider has a free slot is the day we route into — we never
+//      look past it, so a same-day opening always beats a later one.
+//   3. Within that day, rank candidates by:
+//        a. earliest free slot (ISO compares chronologically within a day),
+//        b. then lighter caseload that day (spreads walk-ins across the team
+//           instead of piling them on whoever opens earliest every time),
+//        c. then seed order (stable), so the result is fully deterministic.
+//
+// FAIRNESS
+//   Each issued ticket books its slot, which raises that provider's caseload
+//   for the day. The next walk-in therefore sees them as busier and tends to
+//   pick someone else — load-balancing emerges without any global state.
+//
+// EDGE CASES (all covered by unit + E2E tests)
+//   · provider off / on time-off / lunch  → availableSlots() yields nothing,
+//     so they are silently skipped and can never be routed a patient.
+//   · overlapping / already-booked slots   → excluded via the `taken` flag,
+//     which is the same availability engine online booking uses.
+//   · multiple locations                    → pool spans every site; routing
+//     is site-agnostic (the ticket carries the provider, the provider the
+//     site). A site-restricted variant is a one-line filter when needed.
+//   · nobody free in 7 days / empty pool    → returns null; the caller shows
+//     "no provider available" and issues nothing.
+//   · simultaneous walk-ins                 → deterministic given the same
+//     store; in production the booking write must run in the serializable
+//     transaction that guards double-booking (see production report).
+//
+// COMPLEXITY
+//   O(D · S) per day scanned, D = pool size, S = slots/day (~18). Bounded by
+//   7 days, so effectively O(D) for realistic clinics. `loadOnDay` is O(A)
+//   over appointments; for large A this is the term to index in production.
 export interface RoutingChoice {
   doctorId: string;
   iso: string;
   time: string;
   sameDay: boolean;
+  /** The chosen provider's caseload on the routed day (the tie-break metric). */
   loadToday: number;
+}
+
+function loadOnDay(data: DemoData, doctorId: string, day: Date): number {
+  return data.appointments.filter(
+    (a) =>
+      a.doctorId === doctorId &&
+      a.status !== "cancelled" &&
+      isSameDay(new Date(a.start), day),
+  ).length;
 }
 
 export function routeWalkIn(
@@ -292,26 +351,23 @@ export function routeWalkIn(
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  let best: RoutingChoice | null = null;
   for (let offset = 0; offset < 7; offset++) {
     const day = new Date(today);
     day.setDate(day.getDate() + offset);
+
+    let best: RoutingChoice | null = null;
     for (const doctor of pool) {
       const free = availableSlots(data, doctor.id, day).filter((s) => !s.taken);
       if (free.length === 0) continue;
-      const loadToday = data.appointments.filter(
-        (a) =>
-          a.doctorId === doctor.id &&
-          a.status !== "cancelled" &&
-          isSameDay(new Date(a.start), day),
-      ).length;
       const candidate: RoutingChoice = {
         doctorId: doctor.id,
         iso: free[0].iso,
         time: free[0].time,
         sameDay: offset === 0,
-        loadToday,
+        loadToday: loadOnDay(data, doctor.id, day),
       };
+      // Strict "<" keeps the first candidate on equal (iso, load), so pool
+      // (seed) order is the final, stable tie-break.
       if (
         !best ||
         candidate.iso < best.iso ||
@@ -320,7 +376,7 @@ export function routeWalkIn(
         best = candidate;
       }
     }
-    if (best) return best; // earliest day wins; never look further than needed
+    if (best) return best; // earliest day with any opening wins outright
   }
   return null;
 }

@@ -70,6 +70,21 @@ test("opening a thread clears its unread badge in the sidebar", async ({ page })
     .toBe(0);
 });
 
+test("searching conversations filters the thread list", async ({ page }) => {
+  await page.goto("/clinic/messages", { waitUntil: "networkidle" });
+  await waitForHydration(page);
+
+  // Seeded channels include "Front desk" and "Clinical team".
+  await expect(page.getByRole("button", { name: /Clinical team/ })).toBeVisible();
+
+  await page.getByLabel("Search conversations").fill("front desk");
+  await expect(page.getByRole("button", { name: /Front desk/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Clinical team/ })).toHaveCount(0);
+
+  await page.getByLabel("Search conversations").fill("zzzz-no-match");
+  await expect(page.getByText(/No conversation matches/)).toBeVisible();
+});
+
 test("the team hub fits a phone screen", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/clinic/messages", { waitUntil: "networkidle" });

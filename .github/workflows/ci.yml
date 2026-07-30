@@ -54,6 +54,9 @@ jobs:
       - name: Typecheck
         run: pnpm run typecheck
 
+      - name: Unit tests (pure selectors — routing, availability, finance)
+        run: pnpm run test:unit
+
       - name: Build
         run: pnpm run build
 
