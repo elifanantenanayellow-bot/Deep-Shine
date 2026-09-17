@@ -1,0 +1,107 @@
+{
+  "name": "Rayah — Observe: WhatsApp",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "messages"
+        ],
+        "options": {}
+      },
+      "id": "wa-trigger",
+      "name": "WhatsApp Trigger (inbound)",
+      "type": "n8n-nodes-base.whatsAppTrigger",
+      "typeVersion": 1,
+      "position": [
+        -600,
+        0
+      ],
+      "credentials": {
+        "whatsAppTriggerApi": {
+          "id": "REPLACE_WHATSAPP_TRIGGER_CRED",
+          "name": "WhatsApp Trigger account"
+        }
+      },
+      "webhookId": "rayah-observe-whatsapp"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize an inbound WhatsApp message into the standard envelope.\n// WhatsApp message id makes dedup deterministic (idempotency).\nconst body = $json;\nconst entry = body.messages?.[0] || body.entry?.[0]?.changes?.[0]?.value?.messages?.[0] || {};\nconst contact = body.contacts?.[0] || {};\nconst from = entry.from || contact.wa_id || 'unknown';\nconst text = entry.text?.body || entry.button?.text || entry.interactive?.list_reply?.title || '';\nconst waMsgId = entry.id || ('wa:' + Date.now());\n\nconst envelope = {\n  channel: 'whatsapp',\n  mode: 'OBSERVATION',\n  event_id: 'whatsapp:' + waMsgId,\n  session_id: 'whatsapp:' + from,\n  text,\n  sender: from,\n  subject: null,\n  metadata: { waMessageId: waMsgId, profileName: contact.profile?.name || null },\n  reply_to: from   // reply goes back to this phone number\n};\nreturn [{ json: { envelope } }];"
+      },
+      "id": "norm-wa",
+      "name": "Normalize WhatsApp",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -380,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_BRAIN_WORKFLOW_ID"
+        },
+        "options": {}
+      },
+      "id": "call-brain",
+      "name": "Call Rayah Brain",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        -160,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## OBSERVE — WHATSAPP\\nInbound messages are normalized (message id = idempotency key) and handed to the Brain.\\nThe Brain replies back to the sender's number via the WhatsApp send tool/output.\\nSet the Brain workflow id in **Call Rayah Brain**.",
+        "width": 720,
+        "height": 200
+      },
+      "id": "sn-w",
+      "name": "Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -600,
+        -260
+      ]
+    }
+  ],
+  "connections": {
+    "WhatsApp Trigger (inbound)": {
+      "main": [
+        [
+          {
+            "node": "Normalize WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Call Rayah Brain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}
