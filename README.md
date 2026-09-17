@@ -17,6 +17,7 @@ workflows/
   rayah-brain.json               ← import FIRST. The central reasoning brain + tools.
   rayah-observe-email.json       ← Gmail Trigger → normalize → call Brain.
   rayah-observe-whatsapp.json    ← WhatsApp Trigger → normalize → call Brain.
+  rayah-observe-gchat.json       ← Google Chat webhook → normalize → call Brain.
   rayah-proactive-briefing.json  ← Schedule → morning briefing + hourly urgent sweep.
   _build.py                      ← generator for the JSON (edit + re-run to regenerate).
 docs/
@@ -70,7 +71,7 @@ Open each node showing a credential warning and select/create the real credentia
   `whatsAppApi`) and the WhatsApp Trigger (`whatsAppTriggerApi`).
 
 ### 3. Point the observation workflows at the Brain
-In each of `rayah-observe-email`, `rayah-observe-whatsapp`,
+In each of `rayah-observe-email`, `rayah-observe-whatsapp`, `rayah-observe-gchat`,
 `rayah-proactive-briefing`, open **Call Rayah Brain** and set the workflow to the Brain
 (replace `REPLACE_BRAIN_WORKFLOW_ID`).
 
@@ -96,6 +97,9 @@ Set these in n8n (Settings → Variables/env, or your deployment env):
 ### 8. Configure Google Chat
 - Connect a Google Chat OAuth2 credential. To send, the assistant needs an existing
   space; it uses **List Spaces / Search** to resolve one before sending.
+- For inbound Chat, activate `rayah-observe-gchat` and register its webhook URL as your
+  Google Chat app's HTTP endpoint (Chat API → Configuration). The endpoint ACKs 200 and
+  the Brain replies back to the space asynchronously.
 
 ### 9. Configure Notion
 - Connect Notion and share the relevant databases/pages with the integration.

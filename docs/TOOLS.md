@@ -16,6 +16,8 @@ authorization level so the directive can gate it.
 | **Calendar — Update Event (L2)** | L2 | Modify an existing event by exact `eventId` (patch only named fields). |
 | **Calendar — Delete Event (L4)** | **L4** | Delete/cancel — irreversible; explicit Eli confirmation + exact id only. |
 | **Notion — Search Knowledge** | L1 | Connect an event to existing knowledge (projects, notes, records). |
+| **Notion — Create Note (L2)** | L2 | Store a new note/page under a known parent when something is worth remembering. |
+| **Notion — Update Record (L2)** | L2 | Update an existing database record by exact page id (e.g. a project deadline). Configure the target property in the node. |
 | **Sheets — Append Row (L2)** | L2 | Append structured operational data (logs, follow-ups, tracking) — when Sheets is actually appropriate. |
 | **WhatsApp — Send Message (L3)** | **L3** | Send a WhatsApp text to a known number (E.164). External comms. |
 | **Google Chat — Send Message (L3)** | **L3** | Send to an existing space (`spaces/XXXXX`, normalized). External comms. |

@@ -123,7 +123,9 @@ them back if you manage spaces.
 **Events observed (out of the box):**
 1. **New email** — `Observe: Email` (Gmail Trigger, every minute).
 2. **Inbound WhatsApp** — `Observe: WhatsApp` (WhatsApp Trigger).
-3. **Time** — `Proactive: Briefing & Sweep` (07:00 local full briefing; hourly light
+3. **Inbound Google Chat** — `Observe: Google Chat` (webhook endpoint registered as the
+   Chat app; ACKs 200, normalizes, calls the Brain, replies back to the space).
+4. **Time** — `Proactive: Briefing & Sweep` (07:00 local full briefing; hourly light
    urgent sweep of email + next 2h of calendar).
 
 **How it decides (per event, from the directive):**

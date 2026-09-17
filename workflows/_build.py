@@ -482,27 +482,19 @@ return [{ json: $json }];
         "n8n-nodes-base.code", [280, 120], {"jsCode": log_code}, tv=2))
 
     # ---- Output router --------------------------------------------------
+    def rule(left, val, key):
+        return {"conditions": {"options": {"caseSensitive": True, "typeValidation": "strict"},
+                               "conditions": [{"leftValue": left, "rightValue": val,
+                                               "operator": {"type": "string", "operation": "equals"}}],
+                               "combinator": "and"},
+                "renameOutput": True, "outputKey": key}
     router_params = {
+        "mode": "rules",
         "rules": {
             "values": [
-                {"conditions": {"options": {"caseSensitive": True, "typeValidation": "strict"},
-                                "conditions": [{"leftValue": "={{ $json.envelope.reply_to }}",
-                                                "rightValue": "chat",
-                                                "operator": {"type": "string", "operation": "equals"}}],
-                                "combinator": "and"},
-                 "outputKey": "chat"},
-                {"conditions": {"options": {"caseSensitive": True, "typeValidation": "strict"},
-                                "conditions": [{"leftValue": "={{ $json.envelope.channel }}",
-                                                "rightValue": "whatsapp",
-                                                "operator": {"type": "string", "operation": "equals"}}],
-                                "combinator": "and"},
-                 "outputKey": "whatsapp"},
-                {"conditions": {"options": {"caseSensitive": True, "typeValidation": "strict"},
-                                "conditions": [{"leftValue": "={{ $json.envelope.channel }}",
-                                                "rightValue": "google_chat",
-                                                "operator": {"type": "string", "operation": "equals"}}],
-                                "combinator": "and"},
-                 "outputKey": "google_chat"},
+                rule("={{ $json.envelope.reply_to }}", "chat", "chat"),
+                rule("={{ $json.envelope.channel }}", "whatsapp", "whatsapp"),
+                rule("={{ $json.envelope.channel }}", "google_chat", "google_chat"),
             ]
         },
         "options": {"fallbackOutput": "extra", "renameFallbackOutput": "internal"},
@@ -631,6 +623,27 @@ return [{ json: $json }];
         "n8n-nodes-base.notionTool", [720, tool_y],
         {"resource": "database", "operation": "search",
          "text": fromai("query", "Keywords to search Notion for related pages/knowledge. Derive from the event.")},
+        tv=2.2, creds=CRED["notion"]))
+
+    # -- Notion: create a note page (L2)
+    tools.append(node("tool-notion-create", "Notion — Create Note (L2)",
+        "n8n-nodes-base.notionTool", [720, tool_y + 180],
+        {"resource": "page", "operation": "create",
+         "pageId": {"__rl": True, "mode": "url",
+                    "value": fromai("parentPageOrDbId", "Exact Notion parent page or database id/URL to create under, from trusted data. Never invent.")},
+         "title": fromai("title", "Concise, meaningful note title grounded in the event."),
+         "blockUi": {"blockValues": [{"textContent": fromai("content", "The note body to store. Facts only; never fabricate.")}]},
+         "options": {}},
+        tv=2.2, creds=CRED["notion"]))
+
+    # -- Notion: update a page's property (L2)
+    tools.append(node("tool-notion-update", "Notion — Update Record (L2)",
+        "n8n-nodes-base.notionTool", [720, tool_y + 360],
+        {"resource": "databasePage", "operation": "update",
+         "pageId": {"__rl": True, "mode": "url",
+                    "value": fromai("pageId", "Exact Notion database page id/URL of the record to update, from a prior Notion search. Never invent.")},
+         "propertiesUi": {"propertyValues": []},
+         "options": {}},
         tv=2.2, creds=CRED["notion"]))
 
     # -- Sheets: append (L2)
@@ -905,6 +918,63 @@ return [{ json: { envelope } }];
 
 
 # ===========================================================================
+# WORKFLOW 5 — OBSERVE: GOOGLE CHAT (inbound via webhook)
+# ===========================================================================
+def build_observe_gchat(brain_id_placeholder="REPLACE_BRAIN_WORKFLOW_ID"):
+    nodes = []
+    conns = []
+
+    # Google Chat has no native n8n trigger; it posts events to an HTTP endpoint.
+    # Respond 200 immediately, then process async and reply via the Chat API.
+    nodes.append(node("gc-webhook", "Google Chat Webhook (inbound)",
+        "n8n-nodes-base.webhook", [-820, 0],
+        {"httpMethod": "POST", "path": "rayah-google-chat",
+         "responseMode": "onReceived", "options": {}}, tv=2,
+        webhook="rayah-observe-gchat"))
+
+    norm = r"""
+// Normalize an inbound Google Chat event into the standard envelope.
+// Google Chat delivers events under body (MESSAGE type). Space + message ids
+// give a deterministic idempotency key.
+const b = $json.body || $json;
+const msg = b.message || {};
+const space = (msg.space && msg.space.name) || (b.space && b.space.name) || '';
+const sender = (msg.sender && (msg.sender.displayName || msg.sender.name)) || 'unknown';
+const text = msg.text || b.text || '';
+const msgId = (msg.name) || (space + ':' + Date.now());
+
+const envelope = {
+  channel: 'google_chat',
+  mode: 'OBSERVATION',
+  event_id: 'gchat:' + msgId,
+  session_id: 'gchat:' + space,
+  text,
+  sender,
+  subject: null,
+  metadata: { space, messageName: msg.name || null },
+  reply_to: space   // reply goes back to this space via the Chat send tool/output
+};
+return [{ json: { envelope } }];
+""".strip()
+    nodes.append(node("norm-gc", "Normalize Google Chat",
+        "n8n-nodes-base.code", [-560, 0], {"jsCode": norm}, tv=2))
+
+    nodes.append(node("call-brain", "Call Rayah Brain",
+        "n8n-nodes-base.executeWorkflow", [-300, 0],
+        {"workflowId": {"__rl": True, "mode": "id", "value": brain_id_placeholder},
+         "options": {}}, tv=1.2))
+
+    conns.append(conn("Google Chat Webhook (inbound)", "Normalize Google Chat"))
+    conns.append(conn("Normalize Google Chat", "Call Rayah Brain"))
+
+    nodes.append(sticky("sn-gc", "Note",
+        "## OBSERVE — GOOGLE CHAT\\nRegister this webhook URL as your Google Chat app endpoint.\\nIt ACKs 200 immediately, normalizes the message (space+id = idempotency),\\nand hands it to the Brain, which replies back to the space.\\nSet the Brain workflow id in **Call Rayah Brain**.",
+        [-820, -260], 760, 210))
+
+    return wf("Rayah — Observe: Google Chat", nodes, merge_conns(*conns), active=False)
+
+
+# ===========================================================================
 # EMIT
 # ===========================================================================
 def emit(name, obj):
@@ -919,6 +989,7 @@ def emit(name, obj):
 emit("rayah-brain.json", build_brain())
 emit("rayah-observe-email.json", build_observe_email())
 emit("rayah-observe-whatsapp.json", build_observe_whatsapp())
+emit("rayah-observe-gchat.json", build_observe_gchat())
 emit("rayah-proactive-briefing.json", build_proactive())
 
 # write the raw directive

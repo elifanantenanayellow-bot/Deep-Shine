@@ -151,6 +151,7 @@
     },
     {
       "parameters": {
+        "mode": "rules",
         "rules": {
           "values": [
             {
@@ -171,6 +172,7 @@
                 ],
                 "combinator": "and"
               },
+              "renameOutput": true,
               "outputKey": "chat"
             },
             {
@@ -191,6 +193,7 @@
                 ],
                 "combinator": "and"
               },
+              "renameOutput": true,
               "outputKey": "whatsapp"
             },
             {
@@ -211,6 +214,7 @@
                 ],
                 "combinator": "and"
               },
+              "renameOutput": true,
               "outputKey": "google_chat"
             }
           ]
@@ -530,6 +534,69 @@
       "position": [
         720,
         500
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "REPLACE_NOTION_CRED",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "page",
+        "operation": "create",
+        "pageId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $fromAI('parentPageOrDbId', `Exact Notion parent page or database id/URL to create under, from trusted data. Never invent.`, 'string') }}"
+        },
+        "title": "={{ $fromAI('title', `Concise, meaningful note title grounded in the event.`, 'string') }}",
+        "blockUi": {
+          "blockValues": [
+            {
+              "textContent": "={{ $fromAI('content', `The note body to store. Facts only; never fabricate.`, 'string') }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "tool-notion-create",
+      "name": "Notion — Create Note (L2)",
+      "type": "n8n-nodes-base.notionTool",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        680
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "REPLACE_NOTION_CRED",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $fromAI('pageId', `Exact Notion database page id/URL of the record to update, from a prior Notion search. Never invent.`, 'string') }}"
+        },
+        "propertiesUi": {
+          "propertyValues": []
+        },
+        "options": {}
+      },
+      "id": "tool-notion-update",
+      "name": "Notion — Update Record (L2)",
+      "type": "n8n-nodes-base.notionTool",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        860
       ],
       "credentials": {
         "notionApi": {
@@ -972,6 +1039,28 @@
       ]
     },
     "Notion — Search Knowledge": {
+      "ai_tool": [
+        [
+          {
+            "node": "Rayah — Central Brain",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion — Create Note (L2)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Rayah — Central Brain",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion — Update Record (L2)": {
       "ai_tool": [
         [
           {
