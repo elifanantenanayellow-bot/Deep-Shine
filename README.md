@@ -21,7 +21,10 @@ workflows/            (each has a readable .json AND a single-line .min.json)
   rayah-calendar.*      ← Schedule → morning briefing + hourly urgent sweep → call Brain.
   rayah-notion.*        ← Notion integration-test / callable sub-workflow.
   rayah-sheets.*        ← Google Sheets integration-test / callable sub-workflow.
-  _build.py             ← generator (edit + re-run to regenerate + validate).
+  rayah-automation-runner.* ← polls the Automations sheet, fires due automations via Brain.
+  _build.py             ← generator (edit + re-run to regenerate + validate). SOURCE OF TRUTH.
+tests/
+  logic_test.mjs        ← real execution of deterministic code nodes (12/12 pass).
 N8N_SETUP.md          ← 13-step import & configuration guide.
 TESTING.md            ← 19 tests (Input → Expected → Actual → Pass/Fail).
 docs/

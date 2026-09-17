@@ -14,6 +14,7 @@ to be built by hand. Every file is a complete, validated n8n export.
 | Calendar/Proactive | `rayah-calendar.json` | `rayah-calendar.min.json` | Schedule: morning briefing + hourly sweep → calls Brain. |
 | Notion (utility/test) | `rayah-notion.json` | `rayah-notion.min.json` | Standalone Notion integration test / sub-workflow. |
 | Google Sheets (utility/test) | `rayah-sheets.json` | `rayah-sheets.min.json` | Standalone Sheets integration test / sub-workflow. |
+| Automation Runner | `rayah-automation-runner.json` | `rayah-automation-runner.min.json` | Polls the `Automations` sheet and fires due automations through the Brain. |
 
 **Two ways to import each file:**
 - **Import from File:** n8n → *Workflows* → *⋯* → *Import from File* → pick the `.json`.
@@ -63,10 +64,20 @@ Import `rayah-notion.json`. In it and in the Brain's **Notion — …** tools, s
 with the Notion integration. In **Notion — Update Record (L2)**, map the property you want
 updated (schema-specific — left blank on purpose).
 
-## Step 8 — Configure Google Sheets
-Import `rayah-sheets.json`. In it and in the Brain's **Sheets — Append Row (L2)**, select
-your **Google Sheets OAuth2** credential (placeholder `REPLACE_SHEETS_CRED`). Create a
-spreadsheet with a tab named `Log`; set env var `RAYAH_SHEET_ID` (Step 10).
+## Step 8 — Configure Google Sheets (+ the automation store)
+Import `rayah-sheets.json` and `rayah-automation-runner.json`. In them and in the Brain's
+Sheets/automation tools, select your **Google Sheets OAuth2** credential (placeholder
+`REPLACE_SHEETS_CRED`). In the spreadsheet whose id is `RAYAH_SHEET_ID` (Step 10) create
+**two tabs**:
+- `Log` — columns: `timestamp, source, note` (observability / test rows).
+- `Automations` — header row with columns: `automation_id, name, purpose, schedule_type,
+  next_run, task_type, destination, recipient, recipient_email, chat_space, subject,
+  message, instruction, status, created_at, last_run, last_result`.
+
+The `Automations` tab is the store behind "create an automation": the Brain's
+**Create Automation (L2)** tool writes rows here; the **Automation Runner** reads them each
+minute, fires rows whose `next_run` is due (in `AUTOMATION` mode), reschedules recurring
+ones, and marks one-offs completed.
 
 ## Step 9 — Configure memory
 The Brain's **Short-Term Memory** (window buffer) keys sessions per channel via
@@ -80,11 +91,12 @@ In n8n (Settings → Variables/env or your deploy env):
 - `RAYAH_SHEET_ID` — the Google Sheet id used by the Sheets tool/utility.
 
 ## Step 11 — Connect sub-workflows (Brain id)
-In **each** observation workflow (`rayah-gmail`, `rayah-whatsapp`, `rayah-google-chat`,
-`rayah-calendar`), open the **Call Rayah Brain** node and set its workflow to the Brain —
-this replaces the placeholder `REPLACE_BRAIN_WORKFLOW_ID` from Step 1. (The Notion/Sheets
-utilities also expose an *Execute Workflow Trigger* so the Brain can call them as
-sub-workflows if you later wire them that way.)
+In **each** of `rayah-gmail`, `rayah-whatsapp`, `rayah-google-chat`, `rayah-calendar`, and
+`rayah-automation-runner`, open the **Call Rayah Brain** node and set its workflow to the
+Brain — this replaces the placeholder `REPLACE_BRAIN_WORKFLOW_ID` from Step 1 (documented as
+`RAYAH_BRAIN_WORKFLOW_ID`). n8n only assigns this id at import, so it genuinely cannot be
+pre-filled. (The Notion/Sheets utilities also expose an *Execute Workflow Trigger* so the
+Brain can call them as sub-workflows if you later wire them that way.)
 
 ## Step 12 — Activate triggers
 Activate all workflows so their triggers/webhooks go live: Gmail poll, WhatsApp webhook,

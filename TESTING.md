@@ -6,6 +6,14 @@ Run each test in n8n with the executions panel open. Fill in **Actual result** a
 
 Format: **Input → Expected behavior → Actual result → Pass/Fail**.
 
+## Automated logic tests (already run — real execution)
+`tests/logic_test.mjs` executes the deterministic Code-node logic (normalizer,
+idempotency gate, Gmail normalizer, automation due-selection) extracted from the actual
+workflow JSON. Run it with `node tests/logic_test.mjs` from the repo root. Last run:
+**12/12 PASS** (T14 dedup, T-gmail observation, and all T34–T39 automation-scheduling
+logic are covered here). These are *runtime-verified* for the deterministic layer; the
+LLM/tool tests below require a live n8n + credentials and are *statically validated* only.
+
 ---
 
 ### T1 — AI conversation (interactive)
@@ -126,6 +134,34 @@ Format: **Input → Expected behavior → Actual result → Pass/Fail**.
 - **Input:** Run `rayah-calendar` manually (or wait for 07:00 local).
 - **Expected:** Morning run produces a concise briefing on chat leading with the top
   priority. The hourly sweep stays **silent** when nothing is urgent (no spam).
+- **Actual:** ______  **Pass/Fail:** ___
+
+### T20 — Automation creation (natural language, scheduled)
+- **Input (chat):** "Every morning at 7, send me my important emails on WhatsApp."
+- **Expected:** Brain calls **List Automations** (reuse check) → **Create Automation (L2)**
+  writing an `Automations` row (schedule_type=daily, next_run in UTC, destination=whatsapp).
+  Reports CREATED (row written + tool confirmed), not "sent".
+- **Actual:** ______  **Pass/Fail:** ___
+
+### T21 — Automation firing + verification (runner)
+- **Input:** Add/await a due row in `Automations`; let `rayah-automation-runner` tick.
+- **Expected:** Runner selects the due row, reschedules it (recurring) or completes it
+  (once), then calls the Brain in `AUTOMATION` mode; the Brain sends exactly the stored
+  message to the stored destination and verifies the API result. Same tick never fires it
+  twice (event_id = `auto:<id>:<slot>`). *(Due-selection/reschedule/idempotency logic is
+  runtime-verified by `tests/logic_test.mjs`.)*
+- **Actual:** ______  **Pass/Fail:** ___
+
+### T22 — Automation reuse (no duplicates)
+- **Input (chat):** Repeat T20's request.
+- **Expected:** Brain finds the existing row via List Automations and updates it instead of
+  creating a duplicate.
+- **Actual:** ______  **Pass/Fail:** ___
+
+### T23 — Automation management
+- **Input (chat):** "Pause my morning summary" / "change it to 8 AM".
+- **Expected:** Brain locates the row (List Automations), then **Update Automation (L2)**
+  sets status=paused or a new next_run. Never invents an automation_id.
 - **Actual:** ______  **Pass/Fail:** ___
 
 ---

@@ -227,6 +227,30 @@ IANA zone for that request. Never use the server/UTC timezone silently.
 
 ---
 
+## 10b. AUTOMATION CREATION (natural language → n8n automation)
+
+Eli can ask for recurring/event-driven work in plain language ("every morning
+send me my important emails on WhatsApp", "every Friday summarise my tasks").
+You turn that into a stored automation — you do NOT hand-edit n8n itself.
+
+- Detect the request shape: one-time, scheduled, event-driven, conditional, or
+  monitoring. Extract trigger, condition, action, destination, timezone.
+- **Reuse first:** call `List Automations` before creating. If an equivalent
+  automation exists, update it instead of adding a duplicate.
+- Create it with `Create Automation` (L2). It appends/updates a row in the
+  `Automations` sheet with: automation_id, name, purpose, schedule_type
+  (once|daily|weekly|monthly), next_run (ISO-8601 **UTC**), task_type, destination,
+  recipient, recipient_email, chat_space, subject, message, instruction,
+  status (active), created_at. Resolve next_run from Eli's timezone (§9) into UTC.
+- Manage with `List Automations` (L1) and `Update Automation` (L2: pause/resume/
+  activate/complete). Never invent an automation_id; read it first.
+- The **Automation Runner** workflow fires due rows: it re-enters this Brain in
+  `mode = AUTOMATION`, whose payload is then the ONLY source of truth (no memory,
+  no reuse of prior recipients). Send exactly the stored message to exactly the
+  stored destination; verify the tool result; never claim SENT unless confirmed.
+- CREATED ≠ ACTIVE ≠ SENT. "Automation created" means the row was written and the
+  tool confirmed it — not that it has run.
+
 ## 10. PRE-FLIGHT (silently, before acting)
 
 1. What exactly is being asked / what happened?  2. Which system owns the data?
@@ -656,6 +680,54 @@ return [{ json: $json }];
          "options": {}},
         tv=4.5, creds=CRED["sheets"]))
 
+    # -- Automation: create/update (L2) — writes a row to the Automations sheet
+    tools.append(node("tool-auto-create", "Create Automation (L2)",
+        "n8n-nodes-base.googleSheetsTool", [900, tool_y + 180],
+        {"operation": "appendOrUpdate",
+         "documentId": {"__rl": True, "mode": "id", "value": "={{ $env.RAYAH_SHEET_ID }}"},
+         "sheetName": {"__rl": True, "mode": "list", "value": "Automations"},
+         "columns": {"mappingMode": "defineBelow", "matchingColumns": ["automation_id"],
+                     "value": {
+                         "automation_id": fromai("automation_id", "Stable unique id. Reuse the existing id when updating an automation; otherwise generate a short unique id like auto-<timestamp>."),
+                         "name": fromai("name", "Short human name for the automation."),
+                         "purpose": fromai("purpose", "One line: what this automation is for."),
+                         "schedule_type": fromai("schedule_type", "once | daily | weekly | monthly."),
+                         "next_run": fromai("next_run", "Next run time as ISO-8601 UTC (ending Z), resolved from Eli's timezone. Never invent."),
+                         "task_type": fromai("task_type", "gmail | calendar | chat | whatsapp | notion | sheets | general."),
+                         "destination": fromai("destination", "chat | email | whatsapp | google_chat | none."),
+                         "recipient": fromai("recipient", "Human recipient name or exact users/ resource. Never invent."),
+                         "recipient_email": fromai("recipient_email", "Recipient email when known. Never invent."),
+                         "chat_space": fromai("chat_space", "Exact Google Chat space spaces/XXXXX when destination is google_chat."),
+                         "subject": fromai("subject", "Email subject when destination is email."),
+                         "message": fromai("message", "Exact message to deliver; preserved verbatim at run time."),
+                         "instruction": fromai("instruction", "What Rayah should do when this fires (execution context)."),
+                         "status": "active",
+                         "created_at": "={{ $now.toISO() }}"}},
+         "options": {}},
+        tv=4.5, creds=CRED["sheets"]))
+
+    # -- Automation: list (L1)
+    tools.append(node("tool-auto-list", "List Automations",
+        "n8n-nodes-base.googleSheetsTool", [900, tool_y + 360],
+        {"operation": "read",
+         "documentId": {"__rl": True, "mode": "id", "value": "={{ $env.RAYAH_SHEET_ID }}"},
+         "sheetName": {"__rl": True, "mode": "list", "value": "Automations"},
+         "options": {}},
+        tv=4.5, creds=CRED["sheets"]))
+
+    # -- Automation: update status (L2) — pause/resume/complete by id
+    tools.append(node("tool-auto-update", "Update Automation (L2)",
+        "n8n-nodes-base.googleSheetsTool", [900, tool_y + 540],
+        {"operation": "appendOrUpdate",
+         "documentId": {"__rl": True, "mode": "id", "value": "={{ $env.RAYAH_SHEET_ID }}"},
+         "sheetName": {"__rl": True, "mode": "list", "value": "Automations"},
+         "columns": {"mappingMode": "defineBelow", "matchingColumns": ["automation_id"],
+                     "value": {
+                         "automation_id": fromai("automation_id", "Exact automation_id from List Automations. Never invent."),
+                         "status": fromai("status", "New status: active | paused | completed.")}},
+         "options": {}},
+        tv=4.5, creds=CRED["sheets"]))
+
     # -- WhatsApp send tool (HTTP, L3)
     wa_tool = node("tool-wa-send", "WhatsApp — Send Message (L3)",
         "n8n-nodes-base.httpRequestTool", [1080, tool_y],
@@ -1067,6 +1139,122 @@ return [{ json: {
 
 
 # ===========================================================================
+# WORKFLOW 8 — AUTOMATION RUNNER
+# Polls the Automations sheet, fires due rows through the Brain in AUTOMATION
+# mode, and reschedules/marks them. This is what makes "create an automation"
+# real: natural language -> stored row -> scheduled execution -> verification.
+# ===========================================================================
+def build_automation_runner(brain_id_placeholder="REPLACE_BRAIN_WORKFLOW_ID"):
+    nodes = []
+    conns = []
+
+    nodes.append(node("sched", "Every minute",
+        "n8n-nodes-base.scheduleTrigger", [-980, 0],
+        {"rule": {"interval": [{"field": "minutes", "minutesInterval": 1}]}}, tv=1.2))
+
+    nodes.append(node("read", "Read Automations",
+        "n8n-nodes-base.googleSheets", [-760, 0],
+        {"operation": "read",
+         "documentId": {"__rl": True, "mode": "id", "value": "={{ $env.RAYAH_SHEET_ID }}"},
+         "sheetName": {"__rl": True, "mode": "list", "value": "Automations"},
+         "options": {}},
+        tv=4.5, creds=CRED["sheets"]))
+
+    due_code = r"""
+// Select automations that are DUE, compute their next_run, and build one
+// AUTOMATION envelope per due row. Deterministic: no AI, no guessing.
+const rows = $input.all().map(i => i.json);
+const now = Date.now();
+
+function addInterval(iso, type) {
+  const d = new Date(iso);
+  if (type === 'daily')   d.setUTCDate(d.getUTCDate() + 1);
+  else if (type === 'weekly')  d.setUTCDate(d.getUTCDate() + 7);
+  else if (type === 'monthly') d.setUTCMonth(d.getUTCMonth() + 1);
+  return d.toISOString();
+}
+
+const out = [];
+for (const r of rows) {
+  if (!r || !r.automation_id) continue;
+  if (String(r.status || '').toLowerCase() !== 'active') continue;
+  const next = Date.parse(r.next_run);
+  if (isNaN(next) || next > now) continue;   // not due yet
+
+  const type = String(r.schedule_type || 'once').toLowerCase();
+  const newStatus = (type === 'once') ? 'completed' : 'active';
+  const newNextRun = (type === 'once') ? r.next_run : addInterval(r.next_run, type);
+
+  // event_id ties the run to this exact scheduled slot => idempotent.
+  const envelope = {
+    channel: r.destination || 'chat',
+    mode: 'AUTOMATION',
+    event_id: 'auto:' + r.automation_id + ':' + r.next_run,
+    session_id: 'auto:' + r.automation_id,
+    text: r.message || r.instruction || '',
+    sender: 'automation',
+    subject: r.subject || null,
+    metadata: {
+      automation_id: r.automation_id, task_type: r.task_type,
+      recipient: r.recipient, recipient_email: r.recipient_email,
+      chat_space: r.chat_space, instruction: r.instruction
+    },
+    reply_to: r.destination === 'whatsapp' ? (r.recipient_email || r.recipient)
+            : r.destination === 'google_chat' ? r.chat_space
+            : r.destination === 'email' ? (r.recipient_email || r.recipient)
+            : 'chat',
+    directives: 'run_automation'
+  };
+
+  out.push({ json: {
+    envelope,
+    automation_id: r.automation_id,
+    next_run: newNextRun,
+    last_run: new Date(now).toISOString(),
+    last_result: 'fired',
+    status: newStatus
+  }});
+}
+return out;
+""".strip()
+    nodes.append(node("due", "Select Due Automations",
+        "n8n-nodes-base.code", [-540, 0], {"jsCode": due_code}, tv=2))
+
+    # Claim the slot first (write new next_run/status) => idempotency even if the
+    # Brain call is slow or retried.
+    nodes.append(node("mark", "Reschedule / Mark Run",
+        "n8n-nodes-base.googleSheets", [-320, 0],
+        {"operation": "appendOrUpdate",
+         "documentId": {"__rl": True, "mode": "id", "value": "={{ $env.RAYAH_SHEET_ID }}"},
+         "sheetName": {"__rl": True, "mode": "list", "value": "Automations"},
+         "columns": {"mappingMode": "defineBelow", "matchingColumns": ["automation_id"],
+                     "value": {
+                         "automation_id": "={{ $json.automation_id }}",
+                         "next_run": "={{ $json.next_run }}",
+                         "last_run": "={{ $json.last_run }}",
+                         "last_result": "={{ $json.last_result }}",
+                         "status": "={{ $json.status }}"}},
+         "options": {}},
+        tv=4.5, creds=CRED["sheets"]))
+
+    nodes.append(node("call-brain", "Call Rayah Brain (AUTOMATION)",
+        "n8n-nodes-base.executeWorkflow", [-100, 0],
+        {"workflowId": {"__rl": True, "mode": "id", "value": brain_id_placeholder},
+         "options": {}}, tv=1.2))
+
+    conns.append(conn("Every minute", "Read Automations"))
+    conns.append(conn("Read Automations", "Select Due Automations"))
+    conns.append(conn("Select Due Automations", "Reschedule / Mark Run"))
+    conns.append(conn("Reschedule / Mark Run", "Call Rayah Brain (AUTOMATION)"))
+
+    nodes.append(sticky("sn-run", "Note",
+        "## AUTOMATION RUNNER\\nEvery minute: read the **Automations** sheet, pick rows whose next_run is due,\\nreschedule them (idempotency: the slot is claimed before firing), and call the\\nBrain in AUTOMATION mode with the stored payload as the only source of truth.\\nSet the Brain id in **Call Rayah Brain (AUTOMATION)**; needs the Automations tab + RAYAH_SHEET_ID.",
+        [-980, -300], 900, 240))
+
+    return wf("Rayah — Automation Runner", nodes, merge_conns(*conns), active=False)
+
+
+# ===========================================================================
 # EMIT + VALIDATE (readable .json + single-line .min.json, structural checks)
 # ===========================================================================
 VALID_NODE_TYPES = {
@@ -1137,6 +1325,7 @@ emit("rayah-google-chat", build_observe_gchat())
 emit("rayah-calendar", build_proactive())
 emit("rayah-notion", build_notion_util())
 emit("rayah-sheets", build_sheets_util())
+emit("rayah-automation-runner", build_automation_runner())
 
 # write the raw directive next to the docs copy
 with open(os.path.join(OUT, "DIRECTIVE.txt"), "w") as f:
