@@ -164,6 +164,51 @@ LLM/tool tests below require a live n8n + credentials and are *statically valida
   sets status=paused or a new next_run. Never invents an automation_id.
 - **Actual:** ______  **Pass/Fail:** ___
 
+### T24 — Real n8n workflow creation (scheduled)
+- **Input (chat):** "Every morning at 8, send me an important-email summary on WhatsApp."
+- **Expected:** Brain designs a real workflow (Schedule Trigger → Gmail → AI → filter →
+  WhatsApp), calls **List Workflows** (reuse check), **Create Workflow (L2)** via the API,
+  then **Get Workflow** to verify nodes/connections and capture the id; reports id + state.
+  A live n8n workflow exists — not just a Sheet row.
+- **Actual:** ______  **Pass/Fail:** ___
+
+### T25 — Real event-driven workflow
+- **Input (chat):** "Whenever my manager emails me, notify me on WhatsApp."
+- **Expected:** Brain creates a workflow with a Gmail trigger + sender condition +
+  WhatsApp action; verifies via Get Workflow.
+- **Actual:** ______  **Pass/Fail:** ___
+
+### T26 — Deactivate an existing workflow
+- **Input (chat):** "Disable my morning summary."
+- **Expected:** Brain **List Workflows** → finds it → **Deactivate (L3)** → verifies
+  `active=false`. Never deactivates the Brain (guarded).
+- **Actual:** ______  **Pass/Fail:** ___
+
+### T27 — Modify an existing workflow
+- **Input (chat):** "Change my morning summary to 7 AM."
+- **Expected:** Brain Get Workflow → edits the Schedule Trigger → **Update (L3)** →
+  verifies the new time via Get Workflow.
+- **Actual:** ______  **Pass/Fail:** ___
+
+### T28 — Execution inspection / failure diagnosis
+- **Input (chat):** "What happened in my invoice automation?" / "Why did it fail?"
+- **Expected:** Brain **List Executions** (status=error) → **Get Execution** → names the
+  failing node + reason + impact; proposes a fix. Does not fabricate a result.
+- **Actual:** ______  **Pass/Fail:** ___
+
+### T29 — Reuse (no duplicate workflow)
+- **Input (chat):** Repeat T24.
+- **Expected:** Brain finds the existing workflow via List Workflows and updates/leaves it
+  rather than creating a duplicate.
+- **Actual:** ______  **Pass/Fail:** ___
+
+### T30 — Brain-protection guard (safety)
+- **Input:** Any request that would modify/deactivate/delete the workflow whose id is
+  `RAYAH_BRAIN_WORKFLOW_ID`.
+- **Expected:** The tool throws "Refused: cannot modify the core Brain workflow".
+  *(Runtime-verified by `tests/logic_test.mjs` — T-guard, evaluating the real expression.)*
+- **Actual:** ______  **Pass/Fail:** ___
+
 ---
 
 ## Regression checklist

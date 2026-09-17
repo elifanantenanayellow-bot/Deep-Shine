@@ -88,7 +88,23 @@ in Notion/Sheets (systems of record), not the buffer.
 ## Step 10 — Configure environment variables
 In n8n (Settings → Variables/env or your deploy env):
 - `WHATSAPP_PHONE_NUMBER_ID` — WhatsApp Business phone-number id (used in the send URL).
-- `RAYAH_SHEET_ID` — the Google Sheet id used by the Sheets tool/utility.
+- `RAYAH_SHEET_ID` — the Google Sheet id used by the Sheets tool/utility + automation registry.
+- `RAYAH_BRAIN_WORKFLOW_ID` — the Brain's workflow id (Step 1). The n8n Manager tools use
+  it to **refuse** any modify/activate/deactivate/delete that targets the Brain itself.
+- `N8N_BASE_URL` — your n8n base URL, e.g. `https://n8n.yourhost.com` (no trailing slash).
+- `N8N_API_KEY` — an n8n API key (Settings → **n8n API** → *Create an API key*). Used by the
+  n8n Manager tools via the `X-N8N-API-KEY` header. **Never** hard-code it in a node; it is
+  read from `$env` at runtime.
+
+### The n8n Automation Manager (real workflow control)
+The Brain has tools that call the **n8n Public REST API v1** so Rayah can operate n8n itself:
+`List/Get Workflows`, `List/Get Executions` (L1), `Create Workflow` (L2), `Update`,
+`Activate`, `Deactivate` (L3), `Delete` (L4). Endpoints used: `GET/POST/PUT/DELETE
+/api/v1/workflows[/{id}][/activate|/deactivate]` and `GET /api/v1/executions[/{id}]` — the
+documented public API. Note the public API has **no "run now" endpoint**; a workflow runs
+via its own trigger/webhook. The `Automations` sheet + Runner remain as a lightweight
+**registry/scheduler** for simple timed sends; anything event-driven/conditional/multi-step
+should be a real workflow created through the Manager.
 
 ## Step 11 — Connect sub-workflows (Brain id)
 In **each** of `rayah-gmail`, `rayah-whatsapp`, `rayah-google-chat`, `rayah-calendar`, and

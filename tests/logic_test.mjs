@@ -96,5 +96,42 @@ const rows2 = [{ ...rows[0], next_run: a1.json.next_run }];
 const due2 = runCode(dueCode, { json: {}, allItems: rows2 });
 check('T-auto-norepeat: rescheduled row not due again this tick', due2.length === 0);
 
+// ========================================================================
+// 5) n8n MANAGER — Brain-protection guard (evaluate the REAL expression)
+// ========================================================================
+function evalN8nUrl(expr, { workflow_id, env }) {
+  // expr looks like: ={{ (() => { ... })() }}
+  const body = expr.replace(/^=\{\{\s*/, '').replace(/\s*\}\}$/, '');
+  // shim $fromAI(name, desc?) -> the provided workflow_id; $env -> env object
+  const $fromAI = () => workflow_id;
+  const $env = env;
+  const fn = new Function('$fromAI', '$env', 'return (' + body + ');');
+  return fn($fromAI, $env);
+}
+const upd = brain.nodes.find(n => n.name === 'n8n — Update Workflow (L3)');
+const env = { RAYAH_BRAIN_WORKFLOW_ID: 'BRAIN123', N8N_BASE_URL: 'https://n8n.example.com' };
+
+let threw = false;
+try { evalN8nUrl(upd.parameters.url, { workflow_id: 'BRAIN123', env }); }
+catch (e) { threw = /core Brain/.test(e.message); }
+check('T-guard: Update refuses to target the core Brain id', threw);
+
+let url = evalN8nUrl(upd.parameters.url, { workflow_id: 'WF456', env });
+check('T-guard: Update allows a normal workflow id',
+  url === 'https://n8n.example.com/api/v1/workflows/WF456', `url=${url}`);
+
+const del = brain.nodes.find(n => n.name === 'n8n — Delete Workflow (L4)');
+let threwDel = false;
+try { evalN8nUrl(del.parameters.url, { workflow_id: 'BRAIN123', env }); }
+catch (e) { threwDel = /core Brain/.test(e.message); }
+check('T-guard: Delete refuses to target the core Brain id', threwDel);
+
+// Create/Update use only {name,nodes,connections,settings} in the body
+const create = brain.nodes.find(n => n.name === 'n8n — Create Workflow (L2)');
+check('T-create-body: Create posts only name/nodes/connections/settings',
+  /name:\s*wf\.name/.test(create.parameters.jsonBody)
+  && /connections:\s*wf\.connections/.test(create.parameters.jsonBody)
+  && !/active:/.test(create.parameters.jsonBody));
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

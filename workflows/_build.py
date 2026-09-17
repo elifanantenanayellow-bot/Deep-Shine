@@ -251,6 +251,54 @@ You turn that into a stored automation — you do NOT hand-edit n8n itself.
 - CREATED ≠ ACTIVE ≠ SENT. "Automation created" means the row was written and the
   tool confirmed it — not that it has run.
 
+**Two layers, don't confuse them:**
+- The `Automations` sheet + Automation Runner is a **registry / scheduler / state
+  layer** — good for simple recurring "send X at time T" jobs the Runner executes.
+- The **n8n Automation Manager** (§10c) is how you build a **real n8n workflow** when
+  the objective is event-driven, conditional, or multi-step (its own trigger, filter,
+  branches). Prefer a real workflow for anything beyond a timed message; use the
+  registry for simple scheduled sends.
+
+## 10c. n8n WORKFLOW MANAGEMENT (control n8n itself)
+
+You can operate the n8n platform through the n8n Manager tools (real Public REST API).
+
+Pipeline for "make me an automation" that needs its own trigger/logic:
+`NL → intent+type → design an internal spec → translate to a real n8n workflow JSON →
+Create Workflow → Get Workflow (verify) → Activate (if authorized) → report id+state`.
+
+- **Detect the automation type** and pick the trigger:
+  one-time (run now, no workflow) · scheduled (Schedule Trigger) · event-driven
+  (Gmail/WhatsApp/Chat/Calendar trigger + condition) · conditional (trigger + IF) ·
+  monitoring (schedule/trigger + compare) · multi-step (trigger → analyze → 2+ actions).
+- **Reuse before create:** call **List Workflows** first; if an equivalent exists,
+  Get it and Update it (L3) instead of creating a duplicate.
+- **Design a valid workflow:** real node types, valid parameters, connections that
+  reference existing nodes, `settings.executionOrder = v1`. Reference credentials by
+  placeholder; never embed secrets. Body for Create/Update = {name, nodes, connections,
+  settings} only (no `id`, no `active`).
+- **Verify, don't assume:** after Create/Update, call **Get Workflow** and confirm the
+  nodes, connections, required config, and capture the returned id. A 2xx is not proof.
+  Report id + trigger + actions + state, e.g. "Workflow 'Invoice Tracking' (id XXXX)
+  created and validated; Active".
+- **Diagnose failures:** on a failure, **List Executions** (status=error) → **Get
+  Execution** → state the failing node + reason + impact; propose or (if L3 and safe)
+  apply a minimal fix (bad expression, wrong mapping, broken connection). Never rewrite
+  security, the Brain, credentials, or core architecture to "fix" something.
+
+**Authorization for workflow ops (extends L1–L4):**
+- L1 inspect: List/Get Workflows, List/Get Executions — free.
+- L2 safe creation: create a new low-risk personal workflow — allowed when authorized.
+- L3 modify/activate/deactivate an existing workflow — needs authorization; confirm for
+  production workflows.
+- L4 delete a workflow, bulk messaging, financial, credential or core-architecture
+  changes — explicit Eli confirmation + exact id.
+- The Update/Activate/Deactivate/Delete tools **deterministically refuse** to target the
+  core Brain (`RAYAH_BRAIN_WORKFLOW_ID`). Never try to route around that guard.
+
+Note: the n8n Public API has no "run this workflow now" endpoint — trigger a workflow
+through its own webhook/trigger, not the API. Say so instead of faking a run.
+
 ## 10. PRE-FLIGHT (silently, before acting)
 
 1. What exactly is being asked / what happened?  2. Which system owns the data?
@@ -780,6 +828,79 @@ return [{ json: $json }];
          "options": {}},
         tv=4.2, creds=CRED["gchat"])
     tools.append(gc_spaces)
+
+    # =================================================================
+    # n8n AUTOMATION MANAGER — real n8n Public REST API v1
+    # Base URL + API key come from $env (never embedded). Endpoints are the
+    # documented public API: /api/v1/workflows[/{id}][/activate|/deactivate],
+    # /api/v1/executions[/{id}]. Auth header: X-N8N-API-KEY.
+    # =================================================================
+    N8N_HDR = {"parameters": [{"name": "X-N8N-API-KEY", "value": "={{ $env.N8N_API_KEY }}"}]}
+    ny = tool_y + 720
+
+    def n8n_get(nid, name, desc, url_expr, x):
+        return node(nid, name, "n8n-nodes-base.httpRequestTool", [x, ny],
+            {"toolDescription": desc, "method": "GET", "url": url_expr,
+             "sendHeaders": True, "headerParameters": N8N_HDR, "options": {}}, tv=4.2)
+
+    def n8n_body(nid, name, desc, method, url_expr, json_body, x):
+        return node(nid, name, "n8n-nodes-base.httpRequestTool", [x, ny],
+            {"toolDescription": desc, "method": method, "url": url_expr,
+             "sendHeaders": True, "headerParameters": N8N_HDR,
+             "sendBody": True, "specifyBody": "json", "jsonBody": json_body,
+             "options": {}}, tv=4.2)
+
+    def n8n_nobody(nid, name, desc, method, url_expr, x):
+        return node(nid, name, "n8n-nodes-base.httpRequestTool", [x, ny],
+            {"toolDescription": desc, "method": method, "url": url_expr,
+             "sendHeaders": True, "headerParameters": N8N_HDR, "options": {}}, tv=4.2)
+
+    # Guard: refuse to target the core Brain workflow (deterministic safety).
+    def id_url(suffix=""):
+        return ("={{ (() => { const id = String($fromAI('workflow_id','Exact n8n workflow id from List Workflows. Never invent.')||'').trim();"
+                " if (!id) throw new Error('workflow_id required');"
+                " if (id === String($env.RAYAH_BRAIN_WORKFLOW_ID)) throw new Error('Refused: cannot modify the core Brain workflow');"
+                " return $env.N8N_BASE_URL + '/api/v1/workflows/' + id + '" + suffix + "'; })() }}")
+
+    tools.append(n8n_get("n8n-list", "n8n — List Workflows (L1)",
+        "List all n8n workflows (id, name, active). Use this to find/reuse a workflow before creating a new one, and to resolve a name to its id.",
+        "={{ $env.N8N_BASE_URL + '/api/v1/workflows' }}", 0))
+
+    tools.append(n8n_get("n8n-get", "n8n — Get Workflow (L1)",
+        "Get one n8n workflow's full definition (nodes, connections, settings, active state) by id. Use to inspect before modifying and to VERIFY after creating.",
+        "={{ $env.N8N_BASE_URL + '/api/v1/workflows/' + String($fromAI('workflow_id','Exact workflow id. Never invent.')) }}", 200))
+
+    tools.append(n8n_get("n8n-execs", "n8n — List Executions (L1)",
+        "List recent n8n executions (optionally filtered by workflowId and status) to inspect runs and diagnose failures. Use status=error to find failures.",
+        "={{ $env.N8N_BASE_URL + '/api/v1/executions?includeData=false&limit=20' + ($fromAI('workflow_id','Optional workflow id to filter by; empty for all.') ? '&workflowId=' + $fromAI('workflow_id','') : '') }}", 400))
+
+    tools.append(n8n_get("n8n-exec", "n8n — Get Execution (L1)",
+        "Get one n8n execution by id, including error detail, to diagnose why an automation failed.",
+        "={{ $env.N8N_BASE_URL + '/api/v1/executions/' + String($fromAI('execution_id','Exact execution id from List Executions.')) + '?includeData=true' }}", 600))
+
+    tools.append(n8n_body("n8n-create", "n8n — Create Workflow (L2)",
+        "Create a REAL n8n workflow from a full definition you design. Reuse-first: call List Workflows and confirm no equivalent exists. The body MUST be a JSON object with exactly: name (string), nodes (array of valid n8n nodes), connections (object), settings (object). Do NOT include 'active' or 'id'. Use only real node types and valid parameters. After creating, call Get Workflow to VERIFY nodes/connections and capture the returned id. Never embed secrets; reference credentials by placeholder.",
+        "POST", "={{ $env.N8N_BASE_URL + '/api/v1/workflows' }}",
+        "={{ (() => { const wf = JSON.parse($fromAI('workflow','Full n8n workflow JSON: {name, nodes, connections, settings}. Valid node types only.')); return JSON.stringify({ name: wf.name, nodes: wf.nodes, connections: wf.connections, settings: wf.settings || { executionOrder: 'v1' } }); })() }}",
+        800))
+
+    tools.append(n8n_body("n8n-update", "n8n — Update Workflow (L3)",
+        "Update an EXISTING n8n workflow by id (nodes/connections/settings/name). L3: modifying a live workflow — only when authorized. Refuses to target the core Brain. Inspect with Get Workflow first; keep changes minimal; then VERIFY.",
+        "PUT", id_url(),
+        "={{ (() => { const wf = JSON.parse($fromAI('workflow','Full updated n8n workflow JSON: {name, nodes, connections, settings}.')); return JSON.stringify({ name: wf.name, nodes: wf.nodes, connections: wf.connections, settings: wf.settings || { executionOrder: 'v1' } }); })() }}",
+        1000))
+
+    tools.append(n8n_nobody("n8n-activate", "n8n — Activate Workflow (L3)",
+        "Activate an existing n8n workflow by id so its triggers go live. L3. Refuses to target the core Brain. Verify the returned active=true.",
+        "POST", id_url("/activate"), 1200))
+
+    tools.append(n8n_nobody("n8n-deactivate", "n8n — Deactivate Workflow (L3)",
+        "Deactivate an existing n8n workflow by id (e.g. 'disable my morning summary'). L3. Refuses to target the core Brain. Verify active=false.",
+        "POST", id_url("/deactivate"), 1400))
+
+    tools.append(n8n_nobody("n8n-delete", "n8n — Delete Workflow (L4)",
+        "Permanently delete an n8n workflow by id. L4 high-impact: requires explicit Eli confirmation and an exact id. Refuses to target the core Brain. Never guess the id.",
+        "DELETE", id_url(), 1600))
 
     nodes.extend(tools)
 
