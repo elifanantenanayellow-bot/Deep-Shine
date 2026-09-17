@@ -1,0 +1,919 @@
+{
+  "name": "RAYAH — Automation Runner — PRODUCTION FINAL (CHAT + EMAIL) v3",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "d4738b1c-5e2a-47f6-b937-c061639b4569",
+      "name": "RAYAH — Every Minute1",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1472,
+        1632
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Rayah_Automations"
+        },
+        "filters": {
+          "conditions": []
+        },
+        "returnAll": true
+      },
+      "id": "aa9dc8a1-b212-4dab-9b0b-532b7d89bc99",
+      "name": "RAYAH — Get Automations1",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        -1264,
+        1632
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// RAYAH — FIND DUE AUTOMATIONS  (deterministic, UTC-correct)\n// ============================================================\n// Root-cause fixes:\n//  1. Timezone-aware parsing of next_run. A naive timestamp (no Z / no\n//     offset) is interpreted in the automation's timezone\n//     (default Indian/Antananarivo, UTC+3) and converted to UTC — it is\n//     NEVER blindly treated as UTC. This is what previously made every job\n//     look \"not due\" for 3 hours.\n//  2. Handles Date objects, luxon DateTime, ISO-Z, ISO+offset, and\n//     space-separated SQL datetimes without producing \"Invalid Date\".\n//  3. Recovers rows stuck in 'running' after a crashed execution.\n//  4. Always emits either DUE items or ONE explicit NO_DUE control item so\n//     the \"Any Due?\" gate is deterministic.\n\nconst STALE_MINUTES = 10;\nconst now    = Date.now();\nconst nowIso = new Date(now).toISOString();\nconst input  = $input.all();\n\n// luxon is exposed as the global `DateTime` inside n8n Code nodes.\nconst LX = (typeof DateTime !== 'undefined') ? DateTime : null;\n\n// Convert any stored next_run representation into an absolute UTC epoch (ms).\nfunction toUtcMs(raw, tz) {\n  if (raw === null || raw === undefined) return NaN;\n\n  // Native Date object coming straight from the Data Table.\n  if (raw instanceof Date) return raw.getTime();\n\n  // luxon DateTime object.\n  if (typeof raw === 'object' && typeof raw.toMillis === 'function') {\n    return raw.toMillis();\n  }\n\n  let s = String(raw).trim();\n  if (!s) return NaN;\n\n  // Normalise \"YYYY-MM-DD HH:MM:SS\" (SQL style) to ISO.\n  if (/^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}/.test(s)) s = s.replace(' ', 'T');\n\n  const hasZone = /[zZ]$/.test(s) || /[+-]\\d{2}:?\\d{2}$/.test(s);\n\n  // Absolute timestamp — trust it as-is.\n  if (hasZone) {\n    const d = new Date(s);\n    return d.getTime();\n  }\n\n  // Naive timestamp — interpret in the AUTOMATION timezone, not the server's.\n  if (LX) {\n    const dt = LX.fromISO(s, { zone: tz });\n    if (dt.isValid) return dt.toMillis();\n  }\n\n  // Fallback when luxon / the zone is unavailable.\n  // Antananarivo (EAT) is a fixed UTC+3 with no DST.\n  const d = new Date(s + 'Z'); // read the wall-clock fields as if UTC\n  if (Number.isNaN(d.getTime())) return NaN;\n  const offsetMinutes = (tz === 'Indian/Antananarivo') ? 180 : 0;\n  return d.getTime() - offsetMinutes * 60000;\n}\n\nconst due = [];\n\nfor (const item of input) {\n  const a = item.json ?? {};\n\n  const id = Number(a.id ?? a.automation_id);\n  if (!Number.isFinite(id)) continue;\n\n  const status = String(a.status ?? '').trim().toLowerCase();\n  const tz     = String(a.timezone ?? '').trim() || 'Indian/Antananarivo';\n\n  const nextRunMs = toUtcMs(a.next_run, tz);\n\n  let isDue     = false;\n  let claimFrom = '';\n\n  if (status === 'active') {\n    // Normal path: active and its scheduled UTC time has arrived.\n    if (Number.isFinite(nextRunMs) && nextRunMs <= now) {\n      isDue = true;\n      claimFrom = 'active';\n    }\n  } else if (status === 'running') {\n    // Recovery path: a previous execution claimed this row but never\n    // finished (crash / restart). Reclaim it once it is clearly stale.\n    const claimMs = toUtcMs(a.claimed_at ?? a.last_run, tz);\n    if (!Number.isFinite(claimMs) || (now - claimMs) > STALE_MINUTES * 60000) {\n      isDue = true;\n      claimFrom = 'running';\n    }\n  }\n\n  if (!isDue) continue;\n\n  due.push({\n    ...a,\n\n    id,\n    automation_id: id,\n\n    execution_mode: 'AUTOMATION',\n    due: true,\n\n    // Everything below is canonical UTC so the rest of the runner never has\n    // to guess a timezone again (this self-heals the stored value on write).\n    claim_from_status: claimFrom,\n    claim_time: nowIso,\n    due_at: Number.isFinite(nextRunMs) ? new Date(nextRunMs).toISOString() : nowIso,\n    runner_now: nowIso,\n    timezone: tz,\n    next_run: Number.isFinite(nextRunMs)\n      ? new Date(nextRunMs).toISOString()\n      : String(a.next_run ?? '')\n  });\n}\n\n// No due jobs -> one explicit control item -> Any Due? = FALSE -> Runner Idle.\nif (due.length === 0) {\n  return [{\n    json: {\n      _control: 'NO_DUE_AUTOMATIONS',\n      due: false,\n      checked_at: nowIso,\n      checked_count: input.length\n    }\n  }];\n}\n\nreturn due;\n"
+      },
+      "id": "4874fbba-f14c-4f1e-bae0-1cee1ae672df",
+      "name": "RAYAH — Find Due Automations1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1040,
+        1632
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "rayah-due-condition",
+              "leftValue": "={{ $json.due }}",
+              "rightValue": "={{ true }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "8aedf29f-97a5-4192-90b1-e19b7920f2dc",
+      "name": "RAYAH — Any Due?1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -800,
+        1632
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{\n  json: {\n    ok: true,\n    runner_status: 'idle',\n    due: false,\n    message: 'Runner checked successfully. No automation is due.',\n    checked_at: new Date().toISOString()\n  }\n}];\n"
+      },
+      "id": "3a156bc4-9a13-4378-98ce-691ca34d8381",
+      "name": "RAYAH — Runner Idle",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -560,
+        2000
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Rayah_Automations"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.id }}"
+            },
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "={{ $json.claim_from_status }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "running",
+            "last_status": "running",
+            "last_run": "={{ $json.claim_time }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "schedule_type",
+              "displayName": "schedule_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "schedule",
+              "displayName": "schedule",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "task_type",
+              "displayName": "task_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "instruction",
+              "displayName": "instruction",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "destination",
+              "displayName": "destination",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "next_run",
+              "displayName": "next_run",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "last_run",
+              "displayName": "last_run",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "last_status",
+              "displayName": "last_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "run_count",
+              "displayName": "run_count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "e457a36d-adfd-4301-b146-93305ab1bebb",
+      "name": "RAYAH — Claim Automation1",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        1632
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// RAYAH — PREPARE CLAIMED AUTOMATION\n// ============================================================\n// Re-hydrate the FULL automation payload from the in-memory Find Due\n// snapshot (chat_space, message, recipient, subject, etc. all survive here),\n// keyed by id. If the claim matched nothing (already claimed by a concurrent\n// run) this node simply receives no input and does not execute — which is the\n// intended de-duplication.\n\nconst dueRows = $('RAYAH — Find Due Automations1').all().map(i => i.json);\nconst id = Number($json.id ?? $json.automation_id);\n\nconst original = dueRows.find(a => Number(a.id ?? a.automation_id) === id);\n\nif (!original) {\n  throw new Error('Claimed automation ' + id + ' could not be restored from Find Due snapshot.');\n}\n\nreturn [{\n  json: {\n    ...original,\n    id,\n    automation_id: id,\n    status: 'running',\n    claim_acquired: true,\n    claimed_at: new Date().toISOString()\n  }\n}];\n"
+      },
+      "id": "4c62457f-0167-45a9-8297-a35a3a843ebc",
+      "name": "RAYAH — Prepare Claimed Automation1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -352,
+        1632
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "rayah-is-chat",
+              "leftValue": "={{ String($json.destination ?? '').trim().toLowerCase() }}",
+              "rightValue": "chat",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "8e06140a-cb98-4298-a98f-31b135d22202",
+      "name": "RAYAH — Is Google Chat?1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -128,
+        1632
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{\n(() => {\n  const raw = String($json.chat_space ?? $json.space ?? '').trim();\n  const space = raw\n    .replace(/^https:\\/\\/chat\\.googleapis\\.com\\/v1\\//i, '')\n    .replace(/^\\/+/, '')\n    .replace(/^(spaces\\/)+/, 'spaces/');\n  if (!/^spaces\\/[^/]+$/.test(space)) {\n    throw new Error('Invalid Google Chat chat_space: ' + raw);\n  }\n  return 'https://chat.googleapis.com/v1/' + space + '/messages';\n})()\n}}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleChatOAuth2Api",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{\nJSON.stringify({\n  text: String($json.message ?? '').trim() || String($json.instruction ?? '').trim()\n})\n}}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "89eb1fbe-d782-4a69-8584-d292b40f28b8",
+      "name": "RAYAH — Send Google Chat1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        128,
+        1408
+      ],
+      "credentials": {
+        "googleChatOAuth2Api": {
+          "id": "orrCQI2p40Yp6RqT",
+          "name": "Chat account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// RAYAH — VERIFY GOOGLE CHAT\n// ============================================================\n// Success is based on the ACTUAL Google Chat API response, never on the mere\n// fact that the HTTP node ran. With fullResponse enabled we have statusCode\n// and body; a real success body contains name = \"spaces/<space>/messages/<id>\".\n\nconst original = $('RAYAH — Prepare Claimed Automation1').first().json;\nconst res      = $json ?? {};\n\nconst body = res.body ?? res;\n\nconst statusCode = Number(\n  res.statusCode ??\n  res.status ??\n  body.statusCode ??\n  0\n);\n\nconst resource = String(\n  body.name ??\n  body.message?.name ??\n  ''\n).trim();\n\nconst success =\n  (statusCode >= 200 && statusCode < 300) ||\n  resource.startsWith('spaces/');\n\nreturn [{\n  json: {\n    ...original,\n    execution_result: 'google_chat',\n    execution_success: success,\n    http_status: statusCode || null,\n    chat_message_resource: resource || null,\n    provider_response: body\n  }\n}];\n"
+      },
+      "id": "90015a74-9837-40a1-a796-e8446dbb9b11",
+      "name": "RAYAH — Verify Google Chat1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        352,
+        1408
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "rayah-is-email",
+              "leftValue": "={{ String($json.destination ?? '').trim().toLowerCase() }}",
+              "rightValue": "email",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d754ee0a-fc77-42f0-be7e-ab54a9b00081",
+      "name": "RAYAH — Route Email1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        128,
+        1808
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ String($json.recipient_email || $json.recipient || '').trim() }}",
+        "subject": "={{ String($json.subject || '').trim() }}",
+        "emailType": "text",
+        "message": "={{ String($json.message || $json.instruction || '').trim() }}",
+        "options": {}
+      },
+      "id": "8d804d77-b9df-4d3a-b44e-63c256629f08",
+      "name": "RAYAH — Send Gmail1",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        352,
+        1712
+      ],
+      "webhookId": "0d2c54c7-a4cb-4103-9974-7fcf5e82a299",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "rQw4tzUCIaiIEwnp",
+          "name": "Gmail account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// RAYAH — VERIFY GMAIL\n// ============================================================\nconst original = $('RAYAH — Prepare Claimed Automation1').first().json;\nconst response = $json ?? {};\n\nconst messageId = String(response.id ?? response.messageId ?? '').trim();\nconst threadId  = String(response.threadId ?? '').trim();\n\nconst success = Boolean(messageId || threadId);\n\nreturn [{\n  json: {\n    ...original,\n    execution_result: 'gmail',\n    execution_success: success,\n    gmail_message_id: messageId || null,\n    gmail_thread_id: threadId || null,\n    provider_response: response\n  }\n}];\n"
+      },
+      "id": "07631361-9633-467a-add8-374b4bda1b4c",
+      "name": "RAYAH — Verify Gmail1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        576,
+        1712
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "kcBoGxfZnvFDP2HF",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/kcBoGxfZnvFDP2HF",
+          "cachedResultName": "Rayah Personal Assistant — PRODUCTION FINAL"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "sessionId": "={{ 'rayah-automation-' + String($json.id) + '-' + String(Date.now()) }}",
+            "chatInput": "={{ JSON.stringify({execution_mode:'AUTOMATION',automation_id:$json.id,name:$json.name,task_type:$json.task_type,destination:$json.destination,recipient:$json.recipient,recipient_email:$json.recipient_email,chat_space:$json.chat_space,subject:$json.subject,message:$json.message,instruction:$json.instruction,timezone:$json.timezone||'Indian/Antananarivo',schedule_type:$json.schedule_type,schedule:$json.schedule,next_run:$json.next_run}) }}",
+            "source": "automation_runner",
+            "execution_mode": "AUTOMATION",
+            "automation_id": "={{ $json.id }}",
+            "name": "={{ $json.name || '' }}",
+            "task_type": "={{ $json.task_type || '' }}",
+            "destination": "={{ $json.destination || '' }}",
+            "recipient": "={{ $json.recipient || '' }}",
+            "recipient_email": "={{ $json.recipient_email || '' }}",
+            "chat_space": "={{ $json.chat_space || '' }}",
+            "subject": "={{ $json.subject || '' }}",
+            "message": "={{ $json.message || '' }}",
+            "instruction": "={{ $json.instruction || '' }}",
+            "timezone": "={{ $json.timezone || 'Indian/Antananarivo' }}",
+            "schedule_type": "={{ $json.schedule_type || '' }}",
+            "schedule": "={{ $json.schedule || '' }}",
+            "next_run": "={{ $json.next_run || '' }}"
+          },
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "d8a8a07a-850d-4d54-ab3c-72c2b40ac6d1",
+      "name": "RAYAH — Call Personal Assistant1",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        352,
+        1936
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// RAYAH — VERIFY RAYAH RESULT\n// ============================================================\nconst original    = $('RAYAH — Prepare Claimed Automation1').first().json;\nconst response    = $json ?? {};\nconst serialized  = JSON.stringify(response).toLowerCase();\n\nconst explicitFailure =\n  response.success === false ||\n  response.ok === false ||\n  Boolean(response.error) ||\n  serialized.includes('\"success\":false') ||\n  serialized.includes('\"ok\":false');\n\nreturn [{\n  json: {\n    ...original,\n    execution_result: 'rayah',\n    execution_success: !explicitFailure,\n    rayah_response: response\n  }\n}];\n"
+      },
+      "id": "f3fceb90-f6be-4cf4-898b-f3677ea3aff0",
+      "name": "RAYAH — Verify Rayah Result1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        576,
+        1936
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// RAYAH — PREPARE FINAL AUTOMATION STATUS\n// ============================================================\n// Marks COMPLETED / ACTIVE strictly from verified provider execution.\n// once  + success  -> completed (next_run kept unchanged, status excludes it)\n// recur + success  -> active, next_run advanced in UTC\n// any   + failure  -> active, retry in 5 minutes (run_count still increments)\n\nconst a   = $json ?? {};\nconst now = new Date();\n\nconst success      = a.execution_success === true;\nconst scheduleType = String(a.schedule_type ?? '').trim().toLowerCase();\n\nconst previous = new Date(String(a.next_run ?? ''));\n\nfunction calculateNextRun() {\n  if (Number.isNaN(previous.getTime())) return '';\n  const d = new Date(previous);\n\n  if (scheduleType === 'daily')  { d.setUTCDate(d.getUTCDate() + 1); return d.toISOString(); }\n  if (scheduleType === 'weekly') { d.setUTCDate(d.getUTCDate() + 7); return d.toISOString(); }\n  if (scheduleType === 'hourly') { d.setUTCHours(d.getUTCHours() + 1); return d.toISOString(); }\n\n  if (scheduleType === 'monthly') {\n    const originalDay = d.getUTCDate();\n    d.setUTCDate(1);\n    d.setUTCMonth(d.getUTCMonth() + 1);\n    const lastDay = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();\n    d.setUTCDate(Math.min(originalDay, lastDay));\n    return d.toISOString();\n  }\n  return '';\n}\n\nlet finalStatus, finalLastStatus, finalNextRun;\n\nif (success) {\n  finalLastStatus = 'success';\n  if (scheduleType === 'once' || scheduleType === '') {\n    finalStatus  = 'completed';\n    // Keep the (past) next_run value; status='completed' excludes it from\n    // Find Due, and we avoid writing '' into a dateTime column.\n    finalNextRun = String(a.next_run ?? '');\n  } else {\n    finalStatus  = 'active';\n    const nr = calculateNextRun();\n    finalNextRun = nr || String(a.next_run ?? '');\n  }\n} else {\n  // Failed jobs stay active and retry in 5 minutes.\n  finalStatus     = 'active';\n  finalLastStatus = 'failed';\n  finalNextRun    = new Date(now.getTime() + 5 * 60 * 1000).toISOString();\n}\n\nreturn [{\n  json: {\n    ...a,\n    final_status:      finalStatus,\n    final_last_status: finalLastStatus,\n    final_last_run:    now.toISOString(),\n    final_next_run:    finalNextRun,\n    final_run_count:   Number(a.run_count ?? 0) + 1\n  }\n}];\n"
+      },
+      "id": "088da404-d295-40c8-b3ad-49ec6198b299",
+      "name": "RAYAH — Prepare Final Automation Status1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        864,
+        1632
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Rayah_Automations"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "={{ $json.final_status }}",
+            "next_run": "={{ $json.final_next_run }}",
+            "last_run": "={{ $json.final_last_run }}",
+            "last_status": "={{ $json.final_last_status }}",
+            "run_count": "={{ $json.final_run_count }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "schedule_type",
+              "displayName": "schedule_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "schedule",
+              "displayName": "schedule",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "task_type",
+              "displayName": "task_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "instruction",
+              "displayName": "instruction",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "destination",
+              "displayName": "destination",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "next_run",
+              "displayName": "next_run",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "last_run",
+              "displayName": "last_run",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "last_status",
+              "displayName": "last_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "run_count",
+              "displayName": "run_count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "18f3f4c1-544d-415f-8640-1ca700d6fc35",
+      "name": "RAYAH — Update Automation Status1",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        1088,
+        1632
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const a = $input.first()?.json ?? {};\n\nreturn [{\n  json: {\n    ok: true,\n    automation_id: a.id ?? null,\n    name: a.name ?? '',\n    status: a.final_status ?? '',\n    last_status: a.final_last_status ?? '',\n    execution_success: a.execution_success === true,\n    execution_result: a.execution_result ?? '',\n    http_status: a.http_status ?? null,\n    chat_message_resource: a.chat_message_resource ?? null,\n    next_run: a.final_next_run ?? '',\n    last_run: a.final_last_run ?? '',\n    run_count: a.final_run_count ?? 0,\n    message: a.execution_success === true\n      ? 'Automation executed successfully and provider execution was verified.'\n      : 'Automation failed. It remains active and will retry in 5 minutes.'\n  }\n}];\n"
+      },
+      "id": "11026b3b-e653-4be5-a5e8-e427180874da",
+      "name": "RAYAH — Runner Result1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1312,
+        1632
+      ]
+    },
+    {
+      "parameters": {
+        "content": "RAYAH AUTOMATION RUNNER — PRODUCTION FINAL v3\n\nROOT-CAUSE FIXES:\n1. Find Due parses next_run in the automation timezone\n   (default Indian/Antananarivo, UTC+3) and compares in UTC.\n   Naive timestamps are NO LONGER assumed to be UTC.\n2. Claim / Update filters now match on the id column\n   (keyName was missing before).\n3. Google Chat URL collapses any spaces/spaces/ -> spaces/.\n4. Merge removed — each Verify node feeds Prepare Final directly,\n   so a single-branch run never stalls.\n5. Success requires a verified provider response.\n6. run_count is preserved (Claim no longer resets it).\n7. Rows stuck in 'running' >10 min are auto-recovered.\n\nCREDENTIALS:  Chat account 2 · Gmail account 3\nKeep this workflow Published/Active.",
+        "height": 420,
+        "width": 460,
+        "color": 5
+      },
+      "id": "dcd55d88-7558-49b1-a351-d8b3791fae83",
+      "name": "RAYAH — Production v3 Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1472,
+        1120
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "RAYAH — Every Minute1": {
+      "main": [
+        [
+          {
+            "node": "RAYAH — Get Automations1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RAYAH — Get Automations1": {
+      "main": [
+        [
+          {
+            "node": "RAYAH — Find Due Automations1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RAYAH — Find Due Automations1": {
+      "main": [
+        [
+          {
+            "node": "RAYAH — Any Due?1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RAYAH — Any Due?1": {
+      "main": [
+        [
+          {
+            "node": "RAYAH — Claim Automation1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "RAYAH — Runner Idle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RAYAH — Claim Automation1": {
+      "main": [
+        [
+          {
+            "node": "RAYAH — Prepare Claimed Automation1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RAYAH — Prepare Claimed Automation1": {
+      "main": [
+        [
+          {
+            "node": "RAYAH — Is Google Chat?1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RAYAH — Is Google Chat?1": {
+      "main": [
+        [
+          {
+            "node": "RAYAH — Send Google Chat1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "RAYAH — Route Email1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RAYAH — Send Google Chat1": {
+      "main": [
+        [
+          {
+            "node": "RAYAH — Verify Google Chat1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RAYAH — Route Email1": {
+      "main": [
+        [
+          {
+            "node": "RAYAH — Send Gmail1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "RAYAH — Call Personal Assistant1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RAYAH — Send Gmail1": {
+      "main": [
+        [
+          {
+            "node": "RAYAH — Verify Gmail1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RAYAH — Call Personal Assistant1": {
+      "main": [
+        [
+          {
+            "node": "RAYAH — Verify Rayah Result1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RAYAH — Verify Google Chat1": {
+      "main": [
+        [
+          {
+            "node": "RAYAH — Prepare Final Automation Status1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RAYAH — Verify Gmail1": {
+      "main": [
+        [
+          {
+            "node": "RAYAH — Prepare Final Automation Status1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RAYAH — Verify Rayah Result1": {
+      "main": [
+        [
+          {
+            "node": "RAYAH — Prepare Final Automation Status1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RAYAH — Prepare Final Automation Status1": {
+      "main": [
+        [
+          {
+            "node": "RAYAH — Update Automation Status1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RAYAH — Update Automation Status1": {
+      "main": [
+        [
+          {
+            "node": "RAYAH — Runner Result1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RAYAH — Runner Idle": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "94aed5e1-3106-485b-9b50-5b6f77fae381",
+  "meta": {
+    "instanceId": "66d5b16e7d23f25d99af543c9688346a61867f0f506323552902c9d677db547d"
+  },
+  "tags": []
+}
