@@ -109,7 +109,7 @@ function evalN8nUrl(expr, { workflow_id, env }) {
   return fn($fromAI, $env);
 }
 const upd = brain.nodes.find(n => n.name === 'n8n — Update Workflow (L3)');
-const env = { RAYAH_BRAIN_WORKFLOW_ID: 'BRAIN123', N8N_BASE_URL: 'https://n8n.example.com' };
+const env = { RAYAH_BRAIN_WORKFLOW_ID: 'BRAIN123', N8N_API_BASE: 'https://n8n.example.com/api/v1' };
 
 let threw = false;
 try { evalN8nUrl(upd.parameters.url, { workflow_id: 'BRAIN123', env }); }
@@ -119,6 +119,23 @@ check('T-guard: Update refuses to target the core Brain id', threw);
 let url = evalN8nUrl(upd.parameters.url, { workflow_id: 'WF456', env });
 check('T-guard: Update allows a normal workflow id',
   url === 'https://n8n.example.com/api/v1/workflows/WF456', `url=${url}`);
+
+// Brain id with surrounding whitespace must still be refused (guard trims).
+let threwWs = false;
+try { evalN8nUrl(upd.parameters.url, { workflow_id: '  BRAIN123  ', env }); }
+catch (e) { threwWs = /core Brain/.test(e.message); }
+check('T-guard: whitespace-padded Brain id still refused', threwWs);
+
+// Missing id must throw (never build a URL with an empty id).
+let threwEmpty = false;
+try { evalN8nUrl(upd.parameters.url, { workflow_id: '', env }); }
+catch (e) { threwEmpty = /workflow_id required/.test(e.message); }
+check('T-guard: missing workflow id rejected', threwEmpty);
+
+// Different casing is a DIFFERENT id (n8n ids are case-sensitive) => allowed.
+let urlLc = evalN8nUrl(upd.parameters.url, { workflow_id: 'brain123', env });
+check('T-guard: different-cased id treated as a different workflow (allowed)',
+  urlLc === 'https://n8n.example.com/api/v1/workflows/brain123', `url=${urlLc}`);
 
 const del = brain.nodes.find(n => n.name === 'n8n — Delete Workflow (L4)');
 let threwDel = false;

@@ -7,12 +7,43 @@ Run each test in n8n with the executions panel open. Fill in **Actual result** a
 Format: **Input → Expected behavior → Actual result → Pass/Fail**.
 
 ## Automated logic tests (already run — real execution)
-`tests/logic_test.mjs` executes the deterministic Code-node logic (normalizer,
-idempotency gate, Gmail normalizer, automation due-selection) extracted from the actual
-workflow JSON. Run it with `node tests/logic_test.mjs` from the repo root. Last run:
-**12/12 PASS** (T14 dedup, T-gmail observation, and all T34–T39 automation-scheduling
-logic are covered here). These are *runtime-verified* for the deterministic layer; the
-LLM/tool tests below require a live n8n + credentials and are *statically validated* only.
+`tests/logic_test.mjs` executes the deterministic Code-node logic (normalizer, idempotency
+gate, Gmail normalizer, automation due-selection, and the **n8n Brain-protection guard**,
+evaluated from the real workflow expression) extracted from the actual workflow JSON. Run:
+`node tests/logic_test.mjs`. Last run: **19/19 PASS**. These are *logic-test verified*.
+
+## Live n8n Automation Manager (proof harness)
+`tests/live_n8n_test.mjs` runs the **real** API sequence against your instance
+(list→get→create→verify→update→activate→deactivate→list execs→delete→confirm 404) and prints
+the acceptance table below with actual HTTP codes. `tests/harness_selftest.mjs` validates the
+harness against a **mock** of the n8n API contract (no instance needed) — last run:
+**HARNESS SELF-TEST PASS** (full lifecycle; key never leaks).
+
+**Verification types:** `LIVE RUNTIME VERIFIED` (real call vs real n8n) · `LOGIC TEST
+VERIFIED` (local deterministic / mock-contract) · `STATICALLY VERIFIED` (JSON/structure) ·
+`NOT RUNTIME VERIFIED` (could not test here). **No live n8n exists in this build environment
+(HTTP 000 on the API, no `N8N_*` config), so every real-n8n row is `NOT RUNTIME VERIFIED`
+until you run the harness against your instance.**
+
+| Test | Result (this env) | Verification Type | Evidence |
+|------|------|------|------|
+| List workflows | pending | NOT RUNTIME VERIFIED | run `live_n8n_test.mjs`; logic proven vs mock |
+| Get workflow | pending | NOT RUNTIME VERIFIED | run harness; logic proven vs mock |
+| Create workflow | pending | NOT RUNTIME VERIFIED | run harness; logic proven vs mock |
+| Update workflow | pending | NOT RUNTIME VERIFIED | run harness; logic proven vs mock |
+| Activate/publish | pending | NOT RUNTIME VERIFIED | run harness; logic proven vs mock |
+| Deactivate/unpublish | pending | NOT RUNTIME VERIFIED | run harness; logic proven vs mock |
+| List executions | pending | NOT RUNTIME VERIFIED | run harness; logic proven vs mock |
+| Get execution | pending | NOT RUNTIME VERIFIED | run harness (needs a run) |
+| Failure diagnosis | pending | NOT RUNTIME VERIFIED | needs a manual trigger + failing node |
+| Brain protection | **PASS** | LOGIC TEST VERIFIED | `logic_test.mjs` T-guard (real expression) |
+| Delete protection | **PASS** | LOGIC TEST VERIFIED | `logic_test.mjs` T-guard (delete) |
+| Natural language → workflow | pending | NOT RUNTIME VERIFIED | needs live Brain (LLM) in n8n |
+| Existing workflow reuse | pending | NOT RUNTIME VERIFIED | needs live Brain (LLM) in n8n |
+| Workflow management by language | pending | NOT RUNTIME VERIFIED | needs live Brain (LLM) in n8n |
+| Prompt injection | pending | NOT RUNTIME VERIFIED | needs live Brain (LLM) in n8n |
+| Multi-tool workflow creation | pending | NOT RUNTIME VERIFIED | needs live Brain (LLM) in n8n |
+| Harness lifecycle (vs mock contract) | **PASS** | LOGIC TEST VERIFIED | `harness_selftest.mjs` |
 
 ---
 

@@ -33,6 +33,10 @@ CRED = {
     "sheets": {"googleSheetsOAuth2Api": {"id": "REPLACE_SHEETS_CRED", "name": "Google Sheets account"}},
     "whatsapp": {"whatsAppApi": {"id": "REPLACE_WHATSAPP_CRED", "name": "WhatsApp account"}},
     "whatsapp_trigger": {"whatsAppTriggerApi": {"id": "REPLACE_WHATSAPP_TRIGGER_CRED", "name": "WhatsApp Trigger account"}},
+    # Generic header-auth credential holding the n8n API key (X-N8N-API-KEY).
+    # The secret lives ONLY in n8n's encrypted credential store — never in $env,
+    # never in the workflow file, prompts, logs, or git.
+    "n8n_hdr": {"httpHeaderAuth": {"id": "REPLACE_N8N_API_HEADER_CRED", "name": "n8n API (X-N8N-API-KEY header)"}},
 }
 
 # ---------------------------------------------------------------------------
@@ -830,57 +834,62 @@ return [{ json: $json }];
     tools.append(gc_spaces)
 
     # =================================================================
-    # n8n AUTOMATION MANAGER — real n8n Public REST API v1
-    # Base URL + API key come from $env (never embedded). Endpoints are the
-    # documented public API: /api/v1/workflows[/{id}][/activate|/deactivate],
-    # /api/v1/executions[/{id}]. Auth header: X-N8N-API-KEY.
+    # n8n AUTOMATION MANAGER — real n8n Public REST API
+    # - API key: httpHeaderAuth CREDENTIAL (X-N8N-API-KEY) — secret stays in
+    #   n8n's encrypted store, never in $env / file / prompt / log / git.
+    # - API base path: CONFIGURABLE via $env.N8N_API_BASE (e.g.
+    #   https://host/api/v1). The public API path is configurable in n8n, so we
+    #   never hardcode it. If N8N_BLOCK_ENV_ACCESS_IN_NODE=true, replace the
+    #   $env.N8N_API_BASE literal in these URLs with your base URL (not a secret).
     # =================================================================
-    N8N_HDR = {"parameters": [{"name": "X-N8N-API-KEY", "value": "={{ $env.N8N_API_KEY }}"}]}
     ny = tool_y + 720
+    N8CRED = CRED["n8n_hdr"]
 
     def n8n_get(nid, name, desc, url_expr, x):
         return node(nid, name, "n8n-nodes-base.httpRequestTool", [x, ny],
             {"toolDescription": desc, "method": "GET", "url": url_expr,
-             "sendHeaders": True, "headerParameters": N8N_HDR, "options": {}}, tv=4.2)
+             "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth",
+             "options": {}}, tv=4.2, creds=N8CRED)
 
     def n8n_body(nid, name, desc, method, url_expr, json_body, x):
         return node(nid, name, "n8n-nodes-base.httpRequestTool", [x, ny],
             {"toolDescription": desc, "method": method, "url": url_expr,
-             "sendHeaders": True, "headerParameters": N8N_HDR,
+             "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth",
              "sendBody": True, "specifyBody": "json", "jsonBody": json_body,
-             "options": {}}, tv=4.2)
+             "options": {}}, tv=4.2, creds=N8CRED)
 
     def n8n_nobody(nid, name, desc, method, url_expr, x):
         return node(nid, name, "n8n-nodes-base.httpRequestTool", [x, ny],
             {"toolDescription": desc, "method": method, "url": url_expr,
-             "sendHeaders": True, "headerParameters": N8N_HDR, "options": {}}, tv=4.2)
+             "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth",
+             "options": {}}, tv=4.2, creds=N8CRED)
 
     # Guard: refuse to target the core Brain workflow (deterministic safety).
     def id_url(suffix=""):
         return ("={{ (() => { const id = String($fromAI('workflow_id','Exact n8n workflow id from List Workflows. Never invent.')||'').trim();"
                 " if (!id) throw new Error('workflow_id required');"
-                " if (id === String($env.RAYAH_BRAIN_WORKFLOW_ID)) throw new Error('Refused: cannot modify the core Brain workflow');"
-                " return $env.N8N_BASE_URL + '/api/v1/workflows/' + id + '" + suffix + "'; })() }}")
+                " if (id === String($env.RAYAH_BRAIN_WORKFLOW_ID || '').trim()) throw new Error('Refused: cannot modify the core Brain workflow');"
+                " return $env.N8N_API_BASE + '/workflows/' + id + '" + suffix + "'; })() }}")
 
     tools.append(n8n_get("n8n-list", "n8n — List Workflows (L1)",
         "List all n8n workflows (id, name, active). Use this to find/reuse a workflow before creating a new one, and to resolve a name to its id.",
-        "={{ $env.N8N_BASE_URL + '/api/v1/workflows' }}", 0))
+        "={{ $env.N8N_API_BASE + '/workflows' }}", 0))
 
     tools.append(n8n_get("n8n-get", "n8n — Get Workflow (L1)",
         "Get one n8n workflow's full definition (nodes, connections, settings, active state) by id. Use to inspect before modifying and to VERIFY after creating.",
-        "={{ $env.N8N_BASE_URL + '/api/v1/workflows/' + String($fromAI('workflow_id','Exact workflow id. Never invent.')) }}", 200))
+        "={{ $env.N8N_API_BASE + '/workflows/' + String($fromAI('workflow_id','Exact workflow id. Never invent.')) }}", 200))
 
     tools.append(n8n_get("n8n-execs", "n8n — List Executions (L1)",
         "List recent n8n executions (optionally filtered by workflowId and status) to inspect runs and diagnose failures. Use status=error to find failures.",
-        "={{ $env.N8N_BASE_URL + '/api/v1/executions?includeData=false&limit=20' + ($fromAI('workflow_id','Optional workflow id to filter by; empty for all.') ? '&workflowId=' + $fromAI('workflow_id','') : '') }}", 400))
+        "={{ $env.N8N_API_BASE + '/executions?includeData=false&limit=20' + ($fromAI('workflow_id','Optional workflow id to filter by; empty for all.') ? '&workflowId=' + $fromAI('workflow_id','') : '') }}", 400))
 
     tools.append(n8n_get("n8n-exec", "n8n — Get Execution (L1)",
         "Get one n8n execution by id, including error detail, to diagnose why an automation failed.",
-        "={{ $env.N8N_BASE_URL + '/api/v1/executions/' + String($fromAI('execution_id','Exact execution id from List Executions.')) + '?includeData=true' }}", 600))
+        "={{ $env.N8N_API_BASE + '/executions/' + String($fromAI('execution_id','Exact execution id from List Executions.')) + '?includeData=true' }}", 600))
 
     tools.append(n8n_body("n8n-create", "n8n — Create Workflow (L2)",
         "Create a REAL n8n workflow from a full definition you design. Reuse-first: call List Workflows and confirm no equivalent exists. The body MUST be a JSON object with exactly: name (string), nodes (array of valid n8n nodes), connections (object), settings (object). Do NOT include 'active' or 'id'. Use only real node types and valid parameters. After creating, call Get Workflow to VERIFY nodes/connections and capture the returned id. Never embed secrets; reference credentials by placeholder.",
-        "POST", "={{ $env.N8N_BASE_URL + '/api/v1/workflows' }}",
+        "POST", "={{ $env.N8N_API_BASE + '/workflows' }}",
         "={{ (() => { const wf = JSON.parse($fromAI('workflow','Full n8n workflow JSON: {name, nodes, connections, settings}. Valid node types only.')); return JSON.stringify({ name: wf.name, nodes: wf.nodes, connections: wf.connections, settings: wf.settings || { executionOrder: 'v1' } }); })() }}",
         800))
 

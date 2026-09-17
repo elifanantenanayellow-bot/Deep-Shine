@@ -24,7 +24,9 @@ workflows/            (each has a readable .json AND a single-line .min.json)
   rayah-automation-runner.* ← polls the Automations sheet, fires due automations via Brain.
   _build.py             ← generator (edit + re-run to regenerate + validate). SOURCE OF TRUTH.
 tests/
-  logic_test.mjs        ← real execution of deterministic code nodes (12/12 pass).
+  logic_test.mjs        ← real execution of deterministic code nodes + guard (19/19 pass).
+  live_n8n_test.mjs     ← LIVE proof harness against your n8n (list→create→…→delete).
+  harness_selftest.mjs  ← validates the harness against a mock of the n8n API contract.
 N8N_SETUP.md          ← 13-step import & configuration guide.
 TESTING.md            ← 19 tests (Input → Expected → Actual → Pass/Fail).
 docs/

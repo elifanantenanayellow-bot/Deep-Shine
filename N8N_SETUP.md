@@ -90,21 +90,46 @@ In n8n (Settings → Variables/env or your deploy env):
 - `WHATSAPP_PHONE_NUMBER_ID` — WhatsApp Business phone-number id (used in the send URL).
 - `RAYAH_SHEET_ID` — the Google Sheet id used by the Sheets tool/utility + automation registry.
 - `RAYAH_BRAIN_WORKFLOW_ID` — the Brain's workflow id (Step 1). The n8n Manager tools use
-  it to **refuse** any modify/activate/deactivate/delete that targets the Brain itself.
-- `N8N_BASE_URL` — your n8n base URL, e.g. `https://n8n.yourhost.com` (no trailing slash).
-- `N8N_API_KEY` — an n8n API key (Settings → **n8n API** → *Create an API key*). Used by the
-  n8n Manager tools via the `X-N8N-API-KEY` header. **Never** hard-code it in a node; it is
-  read from `$env` at runtime.
+  it to **deterministically refuse** any modify/activate/deactivate/delete that targets the
+  Brain itself (proven by `tests/logic_test.mjs`).
+- `N8N_API_BASE` — your n8n Public API base **including the version path**, e.g.
+  `https://n8n.yourhost.com/api/v1`. The public API path is configurable in n8n, so it is
+  **not** hardcoded — set this to whatever your instance exposes.
+
+### The n8n API key is a CREDENTIAL, not an env var
+The n8n Manager tools authenticate with a **Header Auth credential** (n8n → Credentials →
+*Header Auth*): Name = `X-N8N-API-KEY`, Value = your API key from Settings → **n8n API** →
+*Create an API key*. Select this credential (placeholder `REPLACE_N8N_API_HEADER_CRED`) on
+every `n8n — …` tool. The secret then lives only in n8n's encrypted store — never in `$env`,
+the workflow file, prompts, logs, chat, or git.
+
+> **`N8N_BLOCK_ENV_ACCESS_IN_NODE`:** only `N8N_API_BASE` (a non-secret URL) and
+> `RAYAH_BRAIN_WORKFLOW_ID` are read from `$env`. If your instance blocks env access in
+> nodes, either allow it for these two non-secret values, or replace the `$env.N8N_API_BASE`
+> / `$env.RAYAH_BRAIN_WORKFLOW_ID` literals in the `n8n — …` tool URLs with your actual
+> values. The API key is unaffected — it is in the credential.
 
 ### The n8n Automation Manager (real workflow control)
-The Brain has tools that call the **n8n Public REST API v1** so Rayah can operate n8n itself:
-`List/Get Workflows`, `List/Get Executions` (L1), `Create Workflow` (L2), `Update`,
-`Activate`, `Deactivate` (L3), `Delete` (L4). Endpoints used: `GET/POST/PUT/DELETE
-/api/v1/workflows[/{id}][/activate|/deactivate]` and `GET /api/v1/executions[/{id}]` — the
-documented public API. Note the public API has **no "run now" endpoint**; a workflow runs
-via its own trigger/webhook. The `Automations` sheet + Runner remain as a lightweight
-**registry/scheduler** for simple timed sends; anything event-driven/conditional/multi-step
-should be a real workflow created through the Manager.
+The Brain calls the **n8n Public REST API** so Rayah can operate n8n itself: `List/Get
+Workflows`, `List/Get Executions` (L1), `Create Workflow` (L2), `Update`, `Activate`,
+`Deactivate` (L3), `Delete` (L4) — using `GET/POST/PUT/DELETE {N8N_API_BASE}/workflows
+[/{id}][/activate|/deactivate]` and `{N8N_API_BASE}/executions[/{id}]`. Note the public API
+has **no "run now" endpoint**; a workflow runs via its own trigger/webhook. The `Automations`
+sheet + Runner remain a lightweight **registry/scheduler** for simple timed sends; anything
+event-driven/conditional/multi-step should be a real workflow created through the Manager.
+
+### Prove it against your instance (live runtime validation)
+```
+export N8N_API_BASE="https://your-n8n/api/v1"
+export N8N_API_KEY="<your api key>"          # only for the test script, not the workflow
+export RAYAH_BRAIN_WORKFLOW_ID="<brain id>"  # so the harness knows what to skip
+node tests/live_n8n_test.mjs
+```
+It runs the full real sequence (list → get → create harmless workflow → verify → update →
+activate → deactivate → list executions → delete → confirm 404) and prints an acceptance
+table with actual HTTP codes. It creates only a harmless Schedule→Set workflow and deletes
+it, and never prints the key. `node tests/harness_selftest.mjs` validates the harness itself
+against a mock of the API contract (no instance needed).
 
 ## Step 11 — Connect sub-workflows (Brain id)
 In **each** of `rayah-gmail`, `rayah-whatsapp`, `rayah-google-chat`, `rayah-calendar`, and
