@@ -975,24 +975,171 @@ return [{ json: { envelope } }];
 
 
 # ===========================================================================
-# EMIT
+# WORKFLOW 6 — NOTION utility / integration-test workflow
+# Standalone, runnable (Manual Trigger) AND callable as a sub-workflow.
 # ===========================================================================
-def emit(name, obj):
-    path = os.path.join(OUT, name)
-    with open(path, "w") as f:
+def build_notion_util():
+    nodes = []
+    conns = []
+
+    nodes.append(node("man", "When clicking Test (manual)",
+        "n8n-nodes-base.manualTrigger", [-820, -40], {}, tv=1))
+    nodes.append(node("exec", "When Called by Brain (sub-workflow)",
+        "n8n-nodes-base.executeWorkflowTrigger", [-820, 160],
+        {"inputSource": "passthrough"}, tv=1.1))
+
+    prep = r"""
+// Prepare Notion parameters. When run manually, edit these defaults.
+// When called as a sub-workflow, pass { action, query, pageId } in the input.
+const i = $json || {};
+return [{ json: {
+  action: i.action || 'search',                 // 'search' | 'update'
+  query:  i.query  || 'Project',                // search text
+  pageId: i.pageId || ''                        // for update
+} }];
+""".strip()
+    nodes.append(node("prep", "Prepare Notion Request",
+        "n8n-nodes-base.code", [-600, 40], {"jsCode": prep}, tv=2))
+
+    # Search branch (safe, L1) — this is the operation the utility runs by default.
+    nodes.append(node("nsearch", "Notion — Search",
+        "n8n-nodes-base.notion", [-360, 40],
+        {"resource": "database", "operation": "search",
+         "text": "={{ $json.query }}"},
+        tv=2.2, creds=CRED["notion"]))
+
+    conns.append(conn("When clicking Test (manual)", "Prepare Notion Request"))
+    conns.append(conn("When Called by Brain (sub-workflow)", "Prepare Notion Request"))
+    conns.append(conn("Prepare Notion Request", "Notion — Search"))
+
+    nodes.append(sticky("sn-n", "Note",
+        "## NOTION — utility & integration test\\nDefault run performs a Notion **search** (L1, safe) so you can verify the credential\\nworks. It is also callable as a sub-workflow ({action, query, pageId}).\\nThe live Notion tools (search / create note / update record) run **inside the Brain**;\\nthis workflow exists so every service has its own importable, testable file.",
+        [-820, -320], 900, 220))
+
+    return wf("Rayah — Notion (utility/test)", nodes, merge_conns(*conns), active=False)
+
+
+# ===========================================================================
+# WORKFLOW 7 — GOOGLE SHEETS utility / integration-test workflow
+# ===========================================================================
+def build_sheets_util():
+    nodes = []
+    conns = []
+
+    nodes.append(node("man", "When clicking Test (manual)",
+        "n8n-nodes-base.manualTrigger", [-820, -40], {}, tv=1))
+    nodes.append(node("exec", "When Called by Brain (sub-workflow)",
+        "n8n-nodes-base.executeWorkflowTrigger", [-820, 160],
+        {"inputSource": "passthrough"}, tv=1.1))
+
+    prep = r"""
+// Prepare a Sheets row. When run manually this appends a test row so you can
+// verify the credential + RAYAH_SHEET_ID env var. When called as a sub-workflow,
+// pass { timestamp, source, note } in the input.
+const i = $json || {};
+return [{ json: {
+  timestamp: i.timestamp || new Date().toISOString(),
+  source:    i.source    || 'integration-test',
+  note:      i.note      || 'Rayah Sheets connectivity OK'
+} }];
+""".strip()
+    nodes.append(node("prep", "Prepare Sheets Row",
+        "n8n-nodes-base.code", [-600, 40], {"jsCode": prep}, tv=2))
+
+    nodes.append(node("sappend", "Sheets — Append Row",
+        "n8n-nodes-base.googleSheets", [-360, 40],
+        {"operation": "append",
+         "documentId": {"__rl": True, "mode": "id", "value": "={{ $env.RAYAH_SHEET_ID }}"},
+         "sheetName": {"__rl": True, "mode": "list", "value": "Log"},
+         "columns": {"mappingMode": "autoMapInputData", "value": {}},
+         "options": {}},
+        tv=4.5, creds=CRED["sheets"]))
+
+    conns.append(conn("When clicking Test (manual)", "Prepare Sheets Row"))
+    conns.append(conn("When Called by Brain (sub-workflow)", "Prepare Sheets Row"))
+    conns.append(conn("Prepare Sheets Row", "Sheets — Append Row"))
+
+    nodes.append(sticky("sn-s", "Note",
+        "## GOOGLE SHEETS — utility & integration test\\nDefault run appends a test row to the tab **Log** in the sheet id `$env.RAYAH_SHEET_ID`.\\nAlso callable as a sub-workflow ({timestamp, source, note}).\\nThe live Sheets tool runs **inside the Brain**; this file lets you verify Sheets alone.",
+        [-820, -320], 900, 220))
+
+    return wf("Rayah — Google Sheets (utility/test)", nodes, merge_conns(*conns), active=False)
+
+
+# ===========================================================================
+# EMIT + VALIDATE (readable .json + single-line .min.json, structural checks)
+# ===========================================================================
+VALID_NODE_TYPES = {
+    "n8n-nodes-base.stickyNote", "n8n-nodes-base.code", "n8n-nodes-base.switch",
+    "n8n-nodes-base.noOp", "n8n-nodes-base.httpRequest", "n8n-nodes-base.httpRequestTool",
+    "n8n-nodes-base.gmailTool", "n8n-nodes-base.gmail", "n8n-nodes-base.gmailTrigger",
+    "n8n-nodes-base.googleCalendarTool", "n8n-nodes-base.googleCalendar",
+    "n8n-nodes-base.notionTool", "n8n-nodes-base.notion",
+    "n8n-nodes-base.googleSheetsTool", "n8n-nodes-base.googleSheets",
+    "n8n-nodes-base.dateTimeTool", "n8n-nodes-base.scheduleTrigger",
+    "n8n-nodes-base.webhook", "n8n-nodes-base.executeWorkflow",
+    "n8n-nodes-base.executeWorkflowTrigger", "n8n-nodes-base.manualTrigger",
+    "n8n-nodes-base.whatsApp", "n8n-nodes-base.whatsAppTrigger",
+    "@n8n/n8n-nodes-langchain.agent", "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+    "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+    "@n8n/n8n-nodes-langchain.chatTrigger",
+}
+
+def validate(name, obj):
+    names = [n["name"] for n in obj["nodes"]]
+    nameset = set(names)
+    errs = []
+    # duplicate node names
+    if len(names) != len(nameset):
+        errs.append("duplicate node names")
+    # node type sanity + required fields
+    for n in obj["nodes"]:
+        if n["type"] not in VALID_NODE_TYPES:
+            errs.append(f"unknown node type: {n['type']}")
+        for req in ("id", "name", "type", "typeVersion", "position", "parameters"):
+            if req not in n:
+                errs.append(f"node {n.get('name')} missing {req}")
+    # connections reference existing nodes
+    for src, d in obj["connections"].items():
+        if src not in nameset:
+            errs.append(f"connection source not a node: {src}")
+        for typ, arr in d.items():
+            for slot in arr:
+                for c in slot:
+                    if c["node"] not in nameset:
+                        errs.append(f"connection target not a node: {c['node']}")
+    return errs
+
+def emit(base, obj):
+    # structural validation
+    errs = validate(base, obj)
+    if errs:
+        raise SystemExit(f"VALIDATION FAILED for {base}: {errs}")
+    readable = os.path.join(OUT, base + ".json")
+    minified = os.path.join(OUT, base + ".min.json")
+    with open(readable, "w") as f:
         json.dump(obj, f, indent=2, ensure_ascii=False)
-    # validate round-trip
-    with open(path) as f:
-        json.load(f)
-    print("OK", name, "nodes:", len(obj.get("nodes", [])))
+    with open(minified, "w") as f:
+        json.dump(obj, f, separators=(",", ":"), ensure_ascii=False)
+    # parse both + consistency (readable == minified content)
+    a = json.load(open(readable))
+    b = json.load(open(minified))
+    assert a == b, f"readable != minified for {base}"
+    # min is one line
+    assert "\n" not in open(minified).read(), f"{base}.min.json is not single-line"
+    print(f"OK {base}: nodes={len(obj['nodes'])} conns={len(obj['connections'])} "
+          f"json={os.path.getsize(readable)}B min={os.path.getsize(minified)}B")
 
-emit("rayah-brain.json", build_brain())
-emit("rayah-observe-email.json", build_observe_email())
-emit("rayah-observe-whatsapp.json", build_observe_whatsapp())
-emit("rayah-observe-gchat.json", build_observe_gchat())
-emit("rayah-proactive-briefing.json", build_proactive())
+emit("rayah-brain", build_brain())
+emit("rayah-gmail", build_observe_email())
+emit("rayah-whatsapp", build_observe_whatsapp())
+emit("rayah-google-chat", build_observe_gchat())
+emit("rayah-calendar", build_proactive())
+emit("rayah-notion", build_notion_util())
+emit("rayah-sheets", build_sheets_util())
 
-# write the raw directive
+# write the raw directive next to the docs copy
 with open(os.path.join(OUT, "DIRECTIVE.txt"), "w") as f:
     f.write(DIRECTIVE)
 print("OK DIRECTIVE.txt")
+print("\nAll workflows validated: JSON parses, structure sound, min==readable, single-line min.")

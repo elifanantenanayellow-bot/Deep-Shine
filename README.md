@@ -13,17 +13,25 @@ configurable authorization policy, verifies the result, and reports only when it
 ## What's here
 
 ```
-workflows/
-  rayah-brain.json               ← import FIRST. The central reasoning brain + tools.
-  rayah-observe-email.json       ← Gmail Trigger → normalize → call Brain.
-  rayah-observe-whatsapp.json    ← WhatsApp Trigger → normalize → call Brain.
-  rayah-observe-gchat.json       ← Google Chat webhook → normalize → call Brain.
-  rayah-proactive-briefing.json  ← Schedule → morning briefing + hourly urgent sweep.
-  _build.py                      ← generator for the JSON (edit + re-run to regenerate).
+workflows/            (each has a readable .json AND a single-line .min.json)
+  rayah-brain.*         ← import FIRST. Central reasoning brain + all tools + memory + router.
+  rayah-gmail.*         ← Gmail Trigger → normalize → call Brain.
+  rayah-whatsapp.*      ← WhatsApp Trigger → normalize → call Brain.
+  rayah-google-chat.*   ← Google Chat webhook → normalize → call Brain.
+  rayah-calendar.*      ← Schedule → morning briefing + hourly urgent sweep → call Brain.
+  rayah-notion.*        ← Notion integration-test / callable sub-workflow.
+  rayah-sheets.*        ← Google Sheets integration-test / callable sub-workflow.
+  _build.py             ← generator (edit + re-run to regenerate + validate).
+N8N_SETUP.md          ← 13-step import & configuration guide.
+TESTING.md            ← 19 tests (Input → Expected → Actual → Pass/Fail).
 docs/
-  ARCHITECTURE.md  (A,B,C,F)   DIRECTIVE.md + DIRECTIVE.txt (D)   TOOLS.md (E)
-  SECURITY.md (G)              TESTING.md (H)
+  ARCHITECTURE.md (A,B,C,F)   DIRECTIVE.md + DIRECTIVE.txt (D)   TOOLS.md (E)   SECURITY.md (G)
 ```
+
+> **Import:** *Workflows → Import from File* for each `.json`, **or** open a `.min.json`,
+> select-all, copy, and paste onto a blank n8n canvas. Import `rayah-brain` first, then set
+> its id in each observation workflow's **Call Rayah Brain** node. Full steps in
+> [`N8N_SETUP.md`](N8N_SETUP.md).
 
 ## Deliverables map
 
@@ -36,9 +44,9 @@ docs/
 | E | Tool architecture | `docs/TOOLS.md` |
 | F | Autonomous behavior | `docs/ARCHITECTURE.md` §F |
 | G | Security / authorization model | `docs/SECURITY.md` |
-| H | Testing plan | `docs/TESTING.md` |
-| I | Complete importable n8n JSON | `workflows/*.json` |
-| J | Setup instructions | this file, below |
+| H | Testing plan | `TESTING.md` (root) |
+| I | Complete importable n8n JSON | `workflows/*.json` + `*.min.json` |
+| J | Setup instructions | `N8N_SETUP.md` (root) + this file |
 
 ---
 
@@ -118,9 +126,13 @@ Set these in n8n (Settings → Variables/env, or your deployment env):
   live. Copy the production webhook URLs from each trigger.
 
 ### 13. Activate & test
-- Activate all four workflows. Then run the suite in [`docs/TESTING.md`](docs/TESTING.md)
-  (email intelligence, WhatsApp, Notion, Sheets, multi-tool, proactive, duplicate
-  protection).
+- Activate all workflows. Then run the 19-test suite in [`TESTING.md`](TESTING.md)
+  (conversation, Gmail observation/analysis, WhatsApp in/out, Chat, Calendar, Notion
+  search/update, Sheets read/write, multi-tool, memory, duplicate protection, API/AI
+  failure, prompt injection, unauthorized action, proactive notification).
+
+> The precise, canonical setup walkthrough is [`N8N_SETUP.md`](N8N_SETUP.md); this section
+> is the summary.
 
 ### Tuning autonomy
 Edit the `POLICY` object in the Brain's **Input Normalizer** node to allow/deny
