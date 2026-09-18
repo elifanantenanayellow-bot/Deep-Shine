@@ -1,0 +1,98 @@
+{
+  "name": "Rayah — Error Handler",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "errtrg",
+      "name": "On Workflow Error",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        -820,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize an n8n error payload into the standard envelope (no secrets).\n// The Error Trigger provides { execution, workflow, ... }.\nconst e = $json || {};\nconst wf = e.workflow || {};\nconst ex = e.execution || {};\nconst err = ex.error || e.error || {};\nconst node = err.node?.name || ex.lastNodeExecuted || 'unknown node';\nconst message = (err.message || 'Unknown error').toString().slice(0, 500);\n\nconst envelope = {\n  channel: 'schedule',\n  mode: 'AUTOMATION',\n  event_id: 'error:' + (wf.id || 'wf') + ':' + (ex.id || Date.now()),\n  text: [\n    'A workflow execution failed. Report it concisely to Eli and, if it is a known',\n    'low-risk fix (bad expression, wrong mapping, broken connection), propose the fix.',\n    '',\n    'Workflow: ' + (wf.name || wf.id || 'unknown'),\n    'Failing node: ' + node,\n    'Error: ' + message,\n    'Execution: ' + (ex.id || 'n/a') + (ex.url ? ' (' + ex.url + ')' : '')\n  ].join('\\n'),\n  sender: 'n8n',\n  subject: 'Workflow failure: ' + (wf.name || wf.id || 'unknown'),\n  metadata: { workflow_id: wf.id, execution_id: ex.id, failing_node: node },\n  reply_to: 'chat',\n  directives: 'report_error'\n};\nreturn [{ json: { envelope } }];"
+      },
+      "id": "norm-err",
+      "name": "Normalize Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -560,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_BRAIN_WORKFLOW_ID"
+        },
+        "options": {}
+      },
+      "id": "call-brain",
+      "name": "Call Rayah Brain",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        -300,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "content": "## ERROR HANDLER\\nSet this workflow as the **Error Workflow** on every other workflow\\n(Settings → Error Workflow). On any failure it normalizes the error (no secrets)\\nand asks the Brain to report it to chat and, when safe, propose a low-risk fix.\\nSet the Brain workflow id in **Call Rayah Brain**.",
+        "width": 760,
+        "height": 220
+      },
+      "id": "sn-err",
+      "name": "Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -820,
+        -280
+      ]
+    }
+  ],
+  "connections": {
+    "On Workflow Error": {
+      "main": [
+        [
+          {
+            "node": "Normalize Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Error": {
+      "main": [
+        [
+          {
+            "node": "Call Rayah Brain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

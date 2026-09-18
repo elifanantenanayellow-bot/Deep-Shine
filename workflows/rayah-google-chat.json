@@ -1,0 +1,104 @@
+{
+  "name": "Rayah — Observe: Google Chat",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "rayah-google-chat",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "gc-webhook",
+      "name": "Google Chat Webhook (inbound)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -820,
+        0
+      ],
+      "webhookId": "rayah-observe-gchat"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize an inbound Google Chat event into the standard envelope.\n// Google Chat delivers events under body (MESSAGE type). Space + message ids\n// give a deterministic idempotency key.\nconst b = $json.body || $json;\nconst msg = b.message || {};\nconst space = (msg.space && msg.space.name) || (b.space && b.space.name) || '';\nconst sender = (msg.sender && (msg.sender.displayName || msg.sender.name)) || 'unknown';\nconst text = msg.text || b.text || '';\nconst msgId = (msg.name) || (space + ':' + Date.now());\n\nconst envelope = {\n  channel: 'google_chat',\n  mode: 'OBSERVATION',\n  event_id: 'gchat:' + msgId,\n  session_id: 'gchat:' + space,\n  text,\n  sender,\n  subject: null,\n  metadata: { space, messageName: msg.name || null },\n  reply_to: space   // reply goes back to this space via the Chat send tool/output\n};\nreturn [{ json: { envelope } }];"
+      },
+      "id": "norm-gc",
+      "name": "Normalize Google Chat",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -560,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_BRAIN_WORKFLOW_ID"
+        },
+        "options": {}
+      },
+      "id": "call-brain",
+      "name": "Call Rayah Brain",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        -300,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "content": "## OBSERVE — GOOGLE CHAT\\nRegister this webhook URL as your Google Chat app endpoint.\\nIt ACKs 200 immediately, normalizes the message (space+id = idempotency),\\nand hands it to the Brain, which replies back to the space.\\nSet the Brain workflow id in **Call Rayah Brain**.",
+        "width": 760,
+        "height": 210
+      },
+      "id": "sn-gc",
+      "name": "Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -820,
+        -260
+      ]
+    }
+  ],
+  "connections": {
+    "Google Chat Webhook (inbound)": {
+      "main": [
+        [
+          {
+            "node": "Normalize Google Chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Google Chat": {
+      "main": [
+        [
+          {
+            "node": "Call Rayah Brain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}
