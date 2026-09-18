@@ -903,6 +903,344 @@
     },
     {
       "parameters": {
+        "toolDescription": "Retrieve one exact Google Chat message. Input the exact resource spaces/SPACE/messages/MESSAGE from trusted Chat data. Never guess ids.",
+        "url": "={{ (() => { let raw = String($fromAI('message','Exact message resource spaces/AAAA/messages/BBBB')||'').trim().replace(/^https:\\\\/\\\\/chat\\\\.googleapis\\\\.com\\\\/v1\\\\//i,'').replace(/^\\\\/+/,'').replace(/^spaces\\\\/+/i,'spaces/'); if(!/^spaces\\/[^/]+\\/messages\\/[^/]+$/.test(raw)) throw new Error('Invalid message: '+raw); return 'https://chat.googleapis.com/v1/'+raw; })() }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleChatOAuth2Api",
+        "options": {}
+      },
+      "id": "tool-gc-getmsg",
+      "name": "Google Chat — Get Message (L1)",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        1800,
+        500
+      ],
+      "credentials": {
+        "googleChatOAuth2Api": {
+          "id": "REPLACE_GCHAT_CRED",
+          "name": "Google Chat account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "List messages from an exact Google Chat space, newest first (up to 100). Use the exact spaces/... resource; never guess it.",
+        "url": "={{ (() => { let s = String($fromAI('space','Exact space resource spaces/AAAA')||'').trim().replace(/^https:\\\\/\\\\/chat\\\\.googleapis\\\\.com\\\\/v1\\\\//i,'').replace(/^\\\\/+/,'').replace(/^spaces\\\\/+/i,'spaces/'); if(!/^spaces\\/[^/]+$/.test(s)) throw new Error('Invalid space: '+s); return 'https://chat.googleapis.com/v1/'+s+'/messages?pageSize=100&orderBy=createTime%20desc'; })() }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleChatOAuth2Api",
+        "options": {}
+      },
+      "id": "tool-gc-listmsg",
+      "name": "Google Chat — List Messages (L1)",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        1980,
+        500
+      ],
+      "credentials": {
+        "googleChatOAuth2Api": {
+          "id": "REPLACE_GCHAT_CRED",
+          "name": "Google Chat account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Find the existing 1:1 Chat space with an exact user. Accept users/person@example.com or person@example.com. Returns 404 if no DM exists.",
+        "url": "={{ (() => { let u = String($fromAI('user','Google Chat user; users/email or email.')||'').trim().replace(/^users\\/+/i,'users/'); if(!u.startsWith('users/')) u='users/'+u; if(!/^users\\/[^/]+$/.test(u)) throw new Error('Invalid user: '+u); return 'https://chat.googleapis.com/v1/spaces:findDirectMessage?name='+encodeURIComponent(u); })() }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleChatOAuth2Api",
+        "options": {}
+      },
+      "id": "tool-gc-finddm",
+      "name": "Google Chat — Find Direct Message (L1)",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        2160,
+        500
+      ],
+      "credentials": {
+        "googleChatOAuth2Api": {
+          "id": "REPLACE_GCHAT_CRED",
+          "name": "Google Chat account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Find existing group chats containing the authenticated user and the specified users. Provide comma-separated users/... resources.",
+        "url": "={{ (() => { const raw = String($fromAI('users','Comma-separated Chat users; users/email or email.')||'').trim(); const users = raw.split(',').map(x=>x.trim()).filter(Boolean).map(x=>x.replace(/^users\\/+/i,'users/')).map(x=>x.startsWith('users/')?x:'users/'+x); if(!users.length||users.some(x=>!/^users\\/[^/]+$/.test(x))) throw new Error('Invalid users list'); return 'https://chat.googleapis.com/v1/spaces:findGroupChats?pageSize=30&'+users.map(u=>'users='+encodeURIComponent(u)).join('&'); })() }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleChatOAuth2Api",
+        "options": {}
+      },
+      "id": "tool-gc-findgroups",
+      "name": "Google Chat — Find Group Chats (L1)",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        2340,
+        500
+      ],
+      "credentials": {
+        "googleChatOAuth2Api": {
+          "id": "REPLACE_GCHAT_CRED",
+          "name": "Google Chat account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Get full details for one exact Google Chat space. Requires an exact spaces/... resource from trusted Chat data.",
+        "url": "={{ (() => { let s = String($fromAI('space','Exact space resource spaces/AAAA')||'').trim().replace(/^https:\\\\/\\\\/chat\\\\.googleapis\\\\.com\\\\/v1\\\\//i,'').replace(/^\\\\/+/,'').replace(/^spaces\\\\/+/i,'spaces/'); if(!/^spaces\\/[^/]+$/.test(s)) throw new Error('Invalid space: '+s); return 'https://chat.googleapis.com/v1/'+s; })() }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleChatOAuth2Api",
+        "options": {}
+      },
+      "id": "tool-gc-getspace",
+      "name": "Google Chat — Get Space (L1)",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        2520,
+        500
+      ],
+      "credentials": {
+        "googleChatOAuth2Api": {
+          "id": "REPLACE_GCHAT_CRED",
+          "name": "Google Chat account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "List memberships in an exact Google Chat space (up to 100). Use the exact spaces/... resource.",
+        "url": "={{ (() => { let s = String($fromAI('space','Exact space resource spaces/AAAA')||'').trim().replace(/^https:\\\\/\\\\/chat\\\\.googleapis\\\\.com\\\\/v1\\\\//i,'').replace(/^\\\\/+/,'').replace(/^spaces\\\\/+/i,'spaces/'); if(!/^spaces\\/[^/]+$/.test(s)) throw new Error('Invalid space: '+s); return 'https://chat.googleapis.com/v1/'+s+'/members?pageSize=100'; })() }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleChatOAuth2Api",
+        "options": {}
+      },
+      "id": "tool-gc-listmembers",
+      "name": "Google Chat — List Members (L1)",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        2700,
+        500
+      ],
+      "credentials": {
+        "googleChatOAuth2Api": {
+          "id": "REPLACE_GCHAT_CRED",
+          "name": "Google Chat account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Get one exact Google Chat membership resource spaces/AAAA/members/BBBB from trusted Chat data.",
+        "url": "={{ (() => { let raw = String($fromAI('member','Exact membership resource spaces/AAAA/members/BBBB')||'').trim().replace(/^https:\\\\/\\\\/chat\\\\.googleapis\\\\.com\\\\/v1\\\\//i,'').replace(/^\\\\/+/,'').replace(/^spaces\\\\/+/i,'spaces/'); if(!/^spaces\\/[^/]+\\/members\\/[^/]+$/.test(raw)) throw new Error('Invalid member: '+raw); return 'https://chat.googleapis.com/v1/'+raw; })() }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleChatOAuth2Api",
+        "options": {}
+      },
+      "id": "tool-gc-getmember",
+      "name": "Google Chat — Get Member (L1)",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        2880,
+        500
+      ],
+      "credentials": {
+        "googleChatOAuth2Api": {
+          "id": "REPLACE_GCHAT_CRED",
+          "name": "Google Chat account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Update the text of an exact Google Chat message (PATCH). L3: only after explicit intent to edit that exact message. Refuses guessed ids.",
+        "url": "={{ (() => { let raw = String($fromAI('message','Exact message resource spaces/AAAA/messages/BBBB')||'').trim().replace(/^https:\\\\/\\\\/chat\\\\.googleapis\\\\.com\\\\/v1\\\\//i,'').replace(/^\\\\/+/,'').replace(/^spaces\\\\/+/i,'spaces/'); if(!/^spaces\\/[^/]+\\/messages\\/[^/]+$/.test(raw)) throw new Error('Invalid message: '+raw); return 'https://chat.googleapis.com/v1/'+raw+'?updateMask=text'; })() }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleChatOAuth2Api",
+        "options": {},
+        "method": "PATCH",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ text: String($fromAI('newText','Complete replacement text for the message.')||'') }) }}"
+      },
+      "id": "tool-gc-updatemsg",
+      "name": "Google Chat — Update Message (L3)",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        1800,
+        1220
+      ],
+      "credentials": {
+        "googleChatOAuth2Api": {
+          "id": "REPLACE_GCHAT_CRED",
+          "name": "Google Chat account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Create a NEW Google Chat space, group chat, or DM via spaces:setup. L3: only when Eli explicitly asks to create a new conversation. Resolve existing destinations first to avoid duplicates.",
+        "url": "https://chat.googleapis.com/v1/spaces:setup",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleChatOAuth2Api",
+        "options": {},
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.parse($fromAI('requestBody','Valid spaces:setup JSON. SPACE+displayName for a named space; GROUP_CHAT + >=2 memberships; DIRECT_MESSAGE + one membership.')) }}"
+      },
+      "id": "tool-gc-setup",
+      "name": "Google Chat — Setup Space/DM/Group (L3)",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        1980,
+        1220
+      ],
+      "credentials": {
+        "googleChatOAuth2Api": {
+          "id": "REPLACE_GCHAT_CRED",
+          "name": "Google Chat account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Add/invite one user to an exact Google Chat space. L3: explicit request + exact space and user resource.",
+        "url": "={{ (() => { let s = String($fromAI('space','Exact space resource spaces/AAAA')||'').trim().replace(/^https:\\\\/\\\\/chat\\\\.googleapis\\\\.com\\\\/v1\\\\//i,'').replace(/^\\\\/+/,'').replace(/^spaces\\\\/+/i,'spaces/'); if(!/^spaces\\/[^/]+$/.test(s)) throw new Error('Invalid space: '+s); return 'https://chat.googleapis.com/v1/'+s+'/members'; })() }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleChatOAuth2Api",
+        "options": {},
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ member: { name: $fromAI('user','User resource to add, e.g. users/person@example.com') } }) }}"
+      },
+      "id": "tool-gc-addmember",
+      "name": "Google Chat — Add Member (L3)",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        2160,
+        1220
+      ],
+      "credentials": {
+        "googleChatOAuth2Api": {
+          "id": "REPLACE_GCHAT_CRED",
+          "name": "Google Chat account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Update an exact Google Chat membership role (ROLE_MEMBER or ROLE_MANAGER). L3: explicit role-change request + trusted membership resource.",
+        "url": "={{ (() => { let raw = String($fromAI('member','Exact membership resource spaces/AAAA/members/BBBB')||'').trim().replace(/^https:\\\\/\\\\/chat\\\\.googleapis\\\\.com\\\\/v1\\\\//i,'').replace(/^\\\\/+/,'').replace(/^spaces\\\\/+/i,'spaces/'); if(!/^spaces\\/[^/]+\\/members\\/[^/]+$/.test(raw)) throw new Error('Invalid member: '+raw); return 'https://chat.googleapis.com/v1/'+raw+'?updateMask=role'; })() }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleChatOAuth2Api",
+        "options": {},
+        "method": "PATCH",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ role: $fromAI('role','ROLE_MEMBER or ROLE_MANAGER') }) }}"
+      },
+      "id": "tool-gc-updaterole",
+      "name": "Google Chat — Update Member Role (L3)",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        2340,
+        1220
+      ],
+      "credentials": {
+        "googleChatOAuth2Api": {
+          "id": "REPLACE_GCHAT_CRED",
+          "name": "Google Chat account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Permanently delete one exact Google Chat message. L4 destructive: explicit intent + exact trusted message resource. Never guess.",
+        "url": "={{ (() => { let raw = String($fromAI('message','Exact message resource spaces/AAAA/messages/BBBB')||'').trim().replace(/^https:\\\\/\\\\/chat\\\\.googleapis\\\\.com\\\\/v1\\\\//i,'').replace(/^\\\\/+/,'').replace(/^spaces\\\\/+/i,'spaces/'); if(!/^spaces\\/[^/]+\\/messages\\/[^/]+$/.test(raw)) throw new Error('Invalid message: '+raw); return 'https://chat.googleapis.com/v1/'+raw; })() }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleChatOAuth2Api",
+        "options": {},
+        "method": "DELETE"
+      },
+      "id": "tool-gc-delmsg",
+      "name": "Google Chat — Delete Message (L4)",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        2520,
+        1220
+      ],
+      "credentials": {
+        "googleChatOAuth2Api": {
+          "id": "REPLACE_GCHAT_CRED",
+          "name": "Google Chat account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Remove one exact membership from Google Chat. L4 destructive: explicit intent + exact trusted membership resource.",
+        "url": "={{ (() => { let raw = String($fromAI('member','Exact membership resource spaces/AAAA/members/BBBB')||'').trim().replace(/^https:\\\\/\\\\/chat\\\\.googleapis\\\\.com\\\\/v1\\\\//i,'').replace(/^\\\\/+/,'').replace(/^spaces\\\\/+/i,'spaces/'); if(!/^spaces\\/[^/]+\\/members\\/[^/]+$/.test(raw)) throw new Error('Invalid member: '+raw); return 'https://chat.googleapis.com/v1/'+raw; })() }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleChatOAuth2Api",
+        "options": {},
+        "method": "DELETE"
+      },
+      "id": "tool-gc-removemember",
+      "name": "Google Chat — Remove Member (L4)",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        2700,
+        1220
+      ],
+      "credentials": {
+        "googleChatOAuth2Api": {
+          "id": "REPLACE_GCHAT_CRED",
+          "name": "Google Chat account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "messageId": "={{ $fromAI('messageId', `Exact Gmail messageId to delete, from a prior Gmail search/get only. L4 destructive: explicit Eli confirmation + unique target. Never guess; a messageId is not a threadId.`, 'string') }}"
+      },
+      "id": "tool-gmail-delete",
+      "name": "Gmail — Delete Email (L4)",
+      "type": "n8n-nodes-base.gmailTool",
+      "typeVersion": 2.2,
+      "position": [
+        -180,
+        680
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_GMAIL_CRED",
+          "name": "Gmail account"
+        }
+      },
+      "webhookId": "rayah-gmail-delete"
+    },
+    {
+      "parameters": {
         "toolDescription": "List all n8n workflows (id, name, active). Use this to find/reuse a workflow before creating a new one, and to resolve a name to its id.",
         "method": "GET",
         "url": "={{ $env.N8N_API_BASE + '/workflows' }}",
@@ -1540,6 +1878,160 @@
       ]
     },
     "Google Chat — List Spaces": {
+      "ai_tool": [
+        [
+          {
+            "node": "Rayah — Central Brain",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Chat — Get Message (L1)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Rayah — Central Brain",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Chat — List Messages (L1)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Rayah — Central Brain",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Chat — Find Direct Message (L1)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Rayah — Central Brain",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Chat — Find Group Chats (L1)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Rayah — Central Brain",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Chat — Get Space (L1)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Rayah — Central Brain",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Chat — List Members (L1)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Rayah — Central Brain",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Chat — Get Member (L1)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Rayah — Central Brain",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Chat — Update Message (L3)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Rayah — Central Brain",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Chat — Setup Space/DM/Group (L3)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Rayah — Central Brain",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Chat — Add Member (L3)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Rayah — Central Brain",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Chat — Update Member Role (L3)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Rayah — Central Brain",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Chat — Delete Message (L4)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Rayah — Central Brain",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Chat — Remove Member (L4)": {
+      "ai_tool": [
+        [
+          {
+            "node": "Rayah — Central Brain",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail — Delete Email (L4)": {
       "ai_tool": [
         [
           {

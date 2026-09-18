@@ -849,6 +849,101 @@ return [{ json: $json }];
     tools.append(gc_spaces)
 
     # =================================================================
+    # FULL GOOGLE CHAT SUITE (merged from System A — hardened resource
+    # validation / spaces-prefix normalization). Read tools L1; edits L3; deletes L4.
+    # =================================================================
+    def gc(nid, name, desc, url, x, y, method=None, body=None, level_note=""):
+        p = {"toolDescription": desc, "url": url,
+             "authentication": "predefinedCredentialType",
+             "nodeCredentialType": "googleChatOAuth2Api", "options": {}}
+        if method:
+            p["method"] = method
+        if body is not None:
+            p.update({"sendBody": True, "specifyBody": "json", "jsonBody": body})
+        return node(nid, name, "n8n-nodes-base.httpRequestTool", [x, y], p, tv=4.2, creds=CRED["gchat"])
+
+    gcy = tool_y + 720
+    NORM = ("String($fromAI('%s','%s')||'').trim().replace(/^https:\\\\/\\\\/chat\\\\.googleapis\\\\.com\\\\/v1\\\\//i,'')"
+            ".replace(/^\\\\/+/,'').replace(/^spaces\\\\/+/i,'spaces/')")
+
+    tools.append(gc("tool-gc-getmsg", "Google Chat — Get Message (L1)",
+        "Retrieve one exact Google Chat message. Input the exact resource spaces/SPACE/messages/MESSAGE from trusted Chat data. Never guess ids.",
+        "={{ (() => { let raw = " + (NORM % ("message", "Exact message resource spaces/AAAA/messages/BBBB")) + "; if(!/^spaces\\/[^/]+\\/messages\\/[^/]+$/.test(raw)) throw new Error('Invalid message: '+raw); return 'https://chat.googleapis.com/v1/'+raw; })() }}",
+        1800, tool_y))
+
+    tools.append(gc("tool-gc-listmsg", "Google Chat — List Messages (L1)",
+        "List messages from an exact Google Chat space, newest first (up to 100). Use the exact spaces/... resource; never guess it.",
+        "={{ (() => { let s = " + (NORM % ("space", "Exact space resource spaces/AAAA")) + "; if(!/^spaces\\/[^/]+$/.test(s)) throw new Error('Invalid space: '+s); return 'https://chat.googleapis.com/v1/'+s+'/messages?pageSize=100&orderBy=createTime%20desc'; })() }}",
+        1980, tool_y))
+
+    tools.append(gc("tool-gc-finddm", "Google Chat — Find Direct Message (L1)",
+        "Find the existing 1:1 Chat space with an exact user. Accept users/person@example.com or person@example.com. Returns 404 if no DM exists.",
+        "={{ (() => { let u = String($fromAI('user','Google Chat user; users/email or email.')||'').trim().replace(/^users\\/+/i,'users/'); if(!u.startsWith('users/')) u='users/'+u; if(!/^users\\/[^/]+$/.test(u)) throw new Error('Invalid user: '+u); return 'https://chat.googleapis.com/v1/spaces:findDirectMessage?name='+encodeURIComponent(u); })() }}",
+        2160, tool_y))
+
+    tools.append(gc("tool-gc-findgroups", "Google Chat — Find Group Chats (L1)",
+        "Find existing group chats containing the authenticated user and the specified users. Provide comma-separated users/... resources.",
+        "={{ (() => { const raw = String($fromAI('users','Comma-separated Chat users; users/email or email.')||'').trim(); const users = raw.split(',').map(x=>x.trim()).filter(Boolean).map(x=>x.replace(/^users\\/+/i,'users/')).map(x=>x.startsWith('users/')?x:'users/'+x); if(!users.length||users.some(x=>!/^users\\/[^/]+$/.test(x))) throw new Error('Invalid users list'); return 'https://chat.googleapis.com/v1/spaces:findGroupChats?pageSize=30&'+users.map(u=>'users='+encodeURIComponent(u)).join('&'); })() }}",
+        2340, tool_y))
+
+    tools.append(gc("tool-gc-getspace", "Google Chat — Get Space (L1)",
+        "Get full details for one exact Google Chat space. Requires an exact spaces/... resource from trusted Chat data.",
+        "={{ (() => { let s = " + (NORM % ("space", "Exact space resource spaces/AAAA")) + "; if(!/^spaces\\/[^/]+$/.test(s)) throw new Error('Invalid space: '+s); return 'https://chat.googleapis.com/v1/'+s; })() }}",
+        2520, tool_y))
+
+    tools.append(gc("tool-gc-listmembers", "Google Chat — List Members (L1)",
+        "List memberships in an exact Google Chat space (up to 100). Use the exact spaces/... resource.",
+        "={{ (() => { let s = " + (NORM % ("space", "Exact space resource spaces/AAAA")) + "; if(!/^spaces\\/[^/]+$/.test(s)) throw new Error('Invalid space: '+s); return 'https://chat.googleapis.com/v1/'+s+'/members?pageSize=100'; })() }}",
+        2700, tool_y))
+
+    tools.append(gc("tool-gc-getmember", "Google Chat — Get Member (L1)",
+        "Get one exact Google Chat membership resource spaces/AAAA/members/BBBB from trusted Chat data.",
+        "={{ (() => { let raw = " + (NORM % ("member", "Exact membership resource spaces/AAAA/members/BBBB")) + "; if(!/^spaces\\/[^/]+\\/members\\/[^/]+$/.test(raw)) throw new Error('Invalid member: '+raw); return 'https://chat.googleapis.com/v1/'+raw; })() }}",
+        2880, tool_y))
+
+    tools.append(gc("tool-gc-updatemsg", "Google Chat — Update Message (L3)",
+        "Update the text of an exact Google Chat message (PATCH). L3: only after explicit intent to edit that exact message. Refuses guessed ids.",
+        "={{ (() => { let raw = " + (NORM % ("message", "Exact message resource spaces/AAAA/messages/BBBB")) + "; if(!/^spaces\\/[^/]+\\/messages\\/[^/]+$/.test(raw)) throw new Error('Invalid message: '+raw); return 'https://chat.googleapis.com/v1/'+raw+'?updateMask=text'; })() }}",
+        1800, gcy, method="PATCH",
+        body="={{ JSON.stringify({ text: String($fromAI('newText','Complete replacement text for the message.')||'') }) }}"))
+
+    tools.append(gc("tool-gc-setup", "Google Chat — Setup Space/DM/Group (L3)",
+        "Create a NEW Google Chat space, group chat, or DM via spaces:setup. L3: only when Eli explicitly asks to create a new conversation. Resolve existing destinations first to avoid duplicates.",
+        "https://chat.googleapis.com/v1/spaces:setup",
+        1980, gcy, method="POST",
+        body="={{ JSON.parse($fromAI('requestBody','Valid spaces:setup JSON. SPACE+displayName for a named space; GROUP_CHAT + >=2 memberships; DIRECT_MESSAGE + one membership.')) }}"))
+
+    tools.append(gc("tool-gc-addmember", "Google Chat — Add Member (L3)",
+        "Add/invite one user to an exact Google Chat space. L3: explicit request + exact space and user resource.",
+        "={{ (() => { let s = " + (NORM % ("space", "Exact space resource spaces/AAAA")) + "; if(!/^spaces\\/[^/]+$/.test(s)) throw new Error('Invalid space: '+s); return 'https://chat.googleapis.com/v1/'+s+'/members'; })() }}",
+        2160, gcy, method="POST",
+        body="={{ JSON.stringify({ member: { name: $fromAI('user','User resource to add, e.g. users/person@example.com') } }) }}"))
+
+    tools.append(gc("tool-gc-updaterole", "Google Chat — Update Member Role (L3)",
+        "Update an exact Google Chat membership role (ROLE_MEMBER or ROLE_MANAGER). L3: explicit role-change request + trusted membership resource.",
+        "={{ (() => { let raw = " + (NORM % ("member", "Exact membership resource spaces/AAAA/members/BBBB")) + "; if(!/^spaces\\/[^/]+\\/members\\/[^/]+$/.test(raw)) throw new Error('Invalid member: '+raw); return 'https://chat.googleapis.com/v1/'+raw+'?updateMask=role'; })() }}",
+        2340, gcy, method="PATCH",
+        body="={{ JSON.stringify({ role: $fromAI('role','ROLE_MEMBER or ROLE_MANAGER') }) }}"))
+
+    tools.append(gc("tool-gc-delmsg", "Google Chat — Delete Message (L4)",
+        "Permanently delete one exact Google Chat message. L4 destructive: explicit intent + exact trusted message resource. Never guess.",
+        "={{ (() => { let raw = " + (NORM % ("message", "Exact message resource spaces/AAAA/messages/BBBB")) + "; if(!/^spaces\\/[^/]+\\/messages\\/[^/]+$/.test(raw)) throw new Error('Invalid message: '+raw); return 'https://chat.googleapis.com/v1/'+raw; })() }}",
+        2520, gcy, method="DELETE"))
+
+    tools.append(gc("tool-gc-removemember", "Google Chat — Remove Member (L4)",
+        "Remove one exact membership from Google Chat. L4 destructive: explicit intent + exact trusted membership resource.",
+        "={{ (() => { let raw = " + (NORM % ("member", "Exact membership resource spaces/AAAA/members/BBBB")) + "; if(!/^spaces\\/[^/]+\\/members\\/[^/]+$/.test(raw)) throw new Error('Invalid member: '+raw); return 'https://chat.googleapis.com/v1/'+raw; })() }}",
+        2700, gcy, method="DELETE"))
+
+    # -- Gmail delete (L4) merged from System A
+    tools.append(node("tool-gmail-delete", "Gmail — Delete Email (L4)",
+        "n8n-nodes-base.gmailTool", [-180, 680],
+        {"operation": "delete",
+         "messageId": fromai("messageId", "Exact Gmail messageId to delete, from a prior Gmail search/get only. L4 destructive: explicit Eli confirmation + unique target. Never guess; a messageId is not a threadId."),
+         },
+        tv=2.2, creds=CRED["gmail"], webhook="rayah-gmail-delete"))
+
+    # =================================================================
     # n8n AUTOMATION MANAGER — real n8n Public REST API
     # - API key: httpHeaderAuth CREDENTIAL (X-N8N-API-KEY) — secret stays in
     #   n8n's encrypted store, never in $env / file / prompt / log / git.
