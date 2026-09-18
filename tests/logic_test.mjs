@@ -150,5 +150,20 @@ check('T-create-body: Create posts only name/nodes/connections/settings',
   && /connections:\s*wf\.connections/.test(create.parameters.jsonBody)
   && !/active:/.test(create.parameters.jsonBody));
 
+// ========================================================================
+// 6) ERROR HANDLER — normalize an n8n error into a report envelope
+// ========================================================================
+const eh = wf('workflows/rayah-error-handler.json');
+const errNorm = codeOf(eh, 'Normalize Error');
+r = runCode(errNorm, { json: {
+  workflow: { id: 'wf9', name: 'Rayah — Gmail' },
+  execution: { id: 'ex42', lastNodeExecuted: 'Gmail Trigger', error: { message: 'auth failed', node: { name: 'Gmail Trigger' } } }
+} });
+check('T-error-norm: failure -> AUTOMATION report envelope on chat',
+  r[0].json.envelope.mode === 'AUTOMATION' && r[0].json.envelope.reply_to === 'chat'
+  && r[0].json.envelope.event_id === 'error:wf9:ex42'
+  && /auth failed/.test(r[0].json.envelope.text)
+  && r[0].json.envelope.metadata.failing_node === 'Gmail Trigger');
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

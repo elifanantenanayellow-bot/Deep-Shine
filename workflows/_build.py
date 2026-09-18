@@ -31,6 +31,7 @@ CRED = {
     "gchat": {"googleChatOAuth2Api": {"id": "REPLACE_GCHAT_CRED", "name": "Google Chat account"}},
     "notion": {"notionApi": {"id": "REPLACE_NOTION_CRED", "name": "Notion account"}},
     "sheets": {"googleSheetsOAuth2Api": {"id": "REPLACE_SHEETS_CRED", "name": "Google Sheets account"}},
+    "drive": {"googleDriveOAuth2Api": {"id": "REPLACE_DRIVE_CRED", "name": "Google Drive account"}},
     "whatsapp": {"whatsAppApi": {"id": "REPLACE_WHATSAPP_CRED", "name": "WhatsApp account"}},
     "whatsapp_trigger": {"whatsAppTriggerApi": {"id": "REPLACE_WHATSAPP_TRIGGER_CRED", "name": "WhatsApp Trigger account"}},
     # Generic header-auth credential holding the n8n API key (X-N8N-API-KEY).
@@ -335,6 +336,12 @@ def node(id, name, ntype, pos, params=None, tv=1, creds=None, extra=None, webhoo
         n.update(extra)
     return n
 
+# Node-level reliability settings (n8n applies these around any node).
+RETRY = {"retryOnFail": True, "maxTries": 3, "waitBetweenTries": 2000}
+# For outbound sends: retry, then continue so the run still reaches logging.
+SEND_RESILIENT = {"retryOnFail": True, "maxTries": 3, "waitBetweenTries": 2000,
+                  "onError": "continueRegularOutput", "alwaysOutputData": True}
+
 def sticky(id, name, content, pos, w, h):
     return node(id, name, "n8n-nodes-base.stickyNote", pos,
                 {"content": content, "width": w, "height": h}, tv=1)
@@ -591,7 +598,7 @@ return [{ json: $json }];
     }
     nodes.append(node("wa-send", "WhatsApp — Send Proactive Reply",
         "n8n-nodes-base.httpRequest", [560, -260], wa_send_params, tv=4.2,
-        creds=CRED["whatsapp"]))
+        creds=CRED["whatsapp"], extra=SEND_RESILIENT))
 
     # ---- Output: Google Chat proactive send ----------------------------
     gc_send_params = {
@@ -606,7 +613,7 @@ return [{ json: $json }];
     }
     nodes.append(node("gc-send", "Google Chat — Send Proactive Reply",
         "n8n-nodes-base.httpRequest", [560, -80], gc_send_params, tv=4.2,
-        creds=CRED["gchat"]))
+        creds=CRED["gchat"], extra=SEND_RESILIENT))
 
     # ---- Output: chat response (respond to chat trigger) ---------------
     nodes.append(node("chat-out", "Return to Chat",
@@ -700,6 +707,14 @@ return [{ json: $json }];
         {"resource": "database", "operation": "search",
          "text": fromai("query", "Keywords to search Notion for related pages/knowledge. Derive from the event.")},
         tv=2.2, creds=CRED["notion"]))
+
+    # -- Google Drive: search (L1)
+    tools.append(node("tool-drive-search", "Google Drive — Search Files (L1)",
+        "n8n-nodes-base.googleDriveTool", [540, tool_y + 180],
+        {"resource": "fileFolder", "operation": "search",
+         "queryString": fromai("query", "Search terms for Google Drive files/folders relevant to the request. Derive from the event; never invent file names."),
+         "returnAll": False, "limit": 15, "filter": {}, "options": {}},
+        tv=3, creds=CRED["drive"]))
 
     # -- Notion: create a note page (L2)
     tools.append(node("tool-notion-create", "Notion — Create Note (L2)",
@@ -1001,7 +1016,7 @@ return [{ json: { envelope } }];
     nodes.append(node("call-brain", "Call Rayah Brain",
         "n8n-nodes-base.executeWorkflow", [-160, 0],
         {"workflowId": {"__rl": True, "mode": "id", "value": brain_id_placeholder},
-         "options": {}}, tv=1.2))
+         "options": {}}, tv=1.2, extra=RETRY))
 
     conns.append(conn("Gmail Trigger (new email)", "Normalize Email"))
     conns.append(conn("Normalize Email", "Call Rayah Brain"))
@@ -1054,7 +1069,7 @@ return [{ json: { envelope } }];
     nodes.append(node("call-brain", "Call Rayah Brain",
         "n8n-nodes-base.executeWorkflow", [-160, 0],
         {"workflowId": {"__rl": True, "mode": "id", "value": brain_id_placeholder},
-         "options": {}}, tv=1.2))
+         "options": {}}, tv=1.2, extra=RETRY))
 
     conns.append(conn("WhatsApp Trigger (inbound)", "Normalize WhatsApp"))
     conns.append(conn("Normalize WhatsApp", "Call Rayah Brain"))
@@ -1107,7 +1122,7 @@ return [{ json: { envelope } }];
     nodes.append(node("call-brain", "Call Rayah Brain",
         "n8n-nodes-base.executeWorkflow", [-160, 0],
         {"workflowId": {"__rl": True, "mode": "id", "value": brain_id_placeholder},
-         "options": {}}, tv=1.2))
+         "options": {}}, tv=1.2, extra=RETRY))
 
     conns.append(conn("Every morning 07:00 + hourly", "Build Proactive Request"))
     conns.append(conn("Build Proactive Request", "Call Rayah Brain"))
@@ -1164,7 +1179,7 @@ return [{ json: { envelope } }];
     nodes.append(node("call-brain", "Call Rayah Brain",
         "n8n-nodes-base.executeWorkflow", [-300, 0],
         {"workflowId": {"__rl": True, "mode": "id", "value": brain_id_placeholder},
-         "options": {}}, tv=1.2))
+         "options": {}}, tv=1.2, extra=RETRY))
 
     conns.append(conn("Google Chat Webhook (inbound)", "Normalize Google Chat"))
     conns.append(conn("Normalize Google Chat", "Call Rayah Brain"))
@@ -1288,7 +1303,7 @@ def build_automation_runner(brain_id_placeholder="REPLACE_BRAIN_WORKFLOW_ID"):
          "documentId": {"__rl": True, "mode": "id", "value": "={{ $env.RAYAH_SHEET_ID }}"},
          "sheetName": {"__rl": True, "mode": "list", "value": "Automations"},
          "options": {}},
-        tv=4.5, creds=CRED["sheets"]))
+        tv=4.5, creds=CRED["sheets"], extra=RETRY))
 
     due_code = r"""
 // Select automations that are DUE, compute their next_run, and build one
@@ -1365,12 +1380,12 @@ return out;
                          "last_result": "={{ $json.last_result }}",
                          "status": "={{ $json.status }}"}},
          "options": {}},
-        tv=4.5, creds=CRED["sheets"]))
+        tv=4.5, creds=CRED["sheets"], extra=RETRY))
 
     nodes.append(node("call-brain", "Call Rayah Brain (AUTOMATION)",
         "n8n-nodes-base.executeWorkflow", [-100, 0],
         {"workflowId": {"__rl": True, "mode": "id", "value": brain_id_placeholder},
-         "options": {}}, tv=1.2))
+         "options": {}}, tv=1.2, extra=RETRY))
 
     conns.append(conn("Every minute", "Read Automations"))
     conns.append(conn("Read Automations", "Select Due Automations"))
@@ -1385,6 +1400,68 @@ return out;
 
 
 # ===========================================================================
+# WORKFLOW 9 — ERROR HANDLER (platform-level failure diagnosis + reporting)
+# Set as the "Error Workflow" on the other workflows (Settings → Error Workflow).
+# n8n calls it whenever any of them fails; it normalizes the failure and asks
+# the Brain to report it (AUTOMATION mode), closing the loop on §8/§34.
+# ===========================================================================
+def build_error_handler(brain_id_placeholder="REPLACE_BRAIN_WORKFLOW_ID"):
+    nodes = []
+    conns = []
+
+    nodes.append(node("errtrg", "On Workflow Error",
+        "n8n-nodes-base.errorTrigger", [-820, 0], {}, tv=1))
+
+    norm = r"""
+// Normalize an n8n error payload into the standard envelope (no secrets).
+// The Error Trigger provides { execution, workflow, ... }.
+const e = $json || {};
+const wf = e.workflow || {};
+const ex = e.execution || {};
+const err = ex.error || e.error || {};
+const node = err.node?.name || ex.lastNodeExecuted || 'unknown node';
+const message = (err.message || 'Unknown error').toString().slice(0, 500);
+
+const envelope = {
+  channel: 'schedule',
+  mode: 'AUTOMATION',
+  event_id: 'error:' + (wf.id || 'wf') + ':' + (ex.id || Date.now()),
+  text: [
+    'A workflow execution failed. Report it concisely to Eli and, if it is a known',
+    'low-risk fix (bad expression, wrong mapping, broken connection), propose the fix.',
+    '',
+    'Workflow: ' + (wf.name || wf.id || 'unknown'),
+    'Failing node: ' + node,
+    'Error: ' + message,
+    'Execution: ' + (ex.id || 'n/a') + (ex.url ? ' (' + ex.url + ')' : '')
+  ].join('\n'),
+  sender: 'n8n',
+  subject: 'Workflow failure: ' + (wf.name || wf.id || 'unknown'),
+  metadata: { workflow_id: wf.id, execution_id: ex.id, failing_node: node },
+  reply_to: 'chat',
+  directives: 'report_error'
+};
+return [{ json: { envelope } }];
+""".strip()
+    nodes.append(node("norm-err", "Normalize Error",
+        "n8n-nodes-base.code", [-560, 0], {"jsCode": norm}, tv=2))
+
+    nodes.append(node("call-brain", "Call Rayah Brain",
+        "n8n-nodes-base.executeWorkflow", [-300, 0],
+        {"workflowId": {"__rl": True, "mode": "id", "value": brain_id_placeholder},
+         "options": {}}, tv=1.2, extra=RETRY))
+
+    conns.append(conn("On Workflow Error", "Normalize Error"))
+    conns.append(conn("Normalize Error", "Call Rayah Brain"))
+
+    nodes.append(sticky("sn-err", "Note",
+        "## ERROR HANDLER\\nSet this workflow as the **Error Workflow** on every other workflow\\n(Settings → Error Workflow). On any failure it normalizes the error (no secrets)\\nand asks the Brain to report it to chat and, when safe, propose a low-risk fix.\\nSet the Brain workflow id in **Call Rayah Brain**.",
+        [-820, -280], 760, 220))
+
+    return wf("Rayah — Error Handler", nodes, merge_conns(*conns), active=False)
+
+
+# ===========================================================================
 # EMIT + VALIDATE (readable .json + single-line .min.json, structural checks)
 # ===========================================================================
 VALID_NODE_TYPES = {
@@ -1394,7 +1471,9 @@ VALID_NODE_TYPES = {
     "n8n-nodes-base.googleCalendarTool", "n8n-nodes-base.googleCalendar",
     "n8n-nodes-base.notionTool", "n8n-nodes-base.notion",
     "n8n-nodes-base.googleSheetsTool", "n8n-nodes-base.googleSheets",
+    "n8n-nodes-base.googleDriveTool", "n8n-nodes-base.googleDrive",
     "n8n-nodes-base.dateTimeTool", "n8n-nodes-base.scheduleTrigger",
+    "n8n-nodes-base.errorTrigger",
     "n8n-nodes-base.webhook", "n8n-nodes-base.executeWorkflow",
     "n8n-nodes-base.executeWorkflowTrigger", "n8n-nodes-base.manualTrigger",
     "n8n-nodes-base.whatsApp", "n8n-nodes-base.whatsAppTrigger",
@@ -1456,6 +1535,7 @@ emit("rayah-calendar", build_proactive())
 emit("rayah-notion", build_notion_util())
 emit("rayah-sheets", build_sheets_util())
 emit("rayah-automation-runner", build_automation_runner())
+emit("rayah-error-handler", build_error_handler())
 
 # write the raw directive next to the docs copy
 with open(os.path.join(OUT, "DIRECTIVE.txt"), "w") as f:

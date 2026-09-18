@@ -22,6 +22,7 @@ workflows/            (each has a readable .json AND a single-line .min.json)
   rayah-notion.*        ← Notion integration-test / callable sub-workflow.
   rayah-sheets.*        ← Google Sheets integration-test / callable sub-workflow.
   rayah-automation-runner.* ← polls the Automations sheet, fires due automations via Brain.
+  rayah-error-handler.* ← Error Workflow: catches any failure, reports it via the Brain.
   _build.py             ← generator (edit + re-run to regenerate + validate). SOURCE OF TRUTH.
 tests/
   logic_test.mjs        ← real execution of deterministic code nodes + guard (19/19 pass).

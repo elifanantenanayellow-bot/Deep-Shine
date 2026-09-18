@@ -24,6 +24,23 @@ authorization level so the directive can gate it.
 | **Google Chat — Search Messages** | L1 | Keyword search Chat for context / to resolve a space. |
 | **Google Chat — List Spaces** | L1 | Resolve a human name to an exact space resource before sending. |
 
+## Additional tools (full belt = 30)
+| Tool (node) | Level | When the agent uses it |
+|---|---|---|
+| **Notion — Create Note / Update Record** | L2 | Store or update knowledge (e.g. a moved deadline). |
+| **Google Drive — Search Files** | L1 | Find files/folders related to an event. |
+| **Sheets — Append Row** | L2 | Structured operational logging. |
+| **Create Automation / List Automations / Update Automation** | L2 / L1 / L2 | Registry layer for simple timed sends (fired by the Automation Runner). |
+| **n8n — List/Get Workflows, List/Get Executions** | L1 | Inspect/reuse real n8n workflows; diagnose failures. |
+| **n8n — Create Workflow** | L2 | Build a real n8n workflow from an AI-designed definition. |
+| **n8n — Update / Activate / Deactivate Workflow** | L3 | Modify/enable an existing workflow (guarded against the Brain). |
+| **n8n — Delete Workflow** | L4 | Delete a workflow (explicit confirmation + exact id; Brain-guarded). |
+
+The Automation **Runner** and **Error Handler** are workflows, not agent tools: the Runner
+fires due `Automations` rows through the Brain; the Error Handler (set as each workflow's
+Error Workflow) reports any failure through the Brain. Network-dependent nodes carry
+`retryOnFail` (3× / 2s), and outbound sends continue-on-error to still reach the log.
+
 ## Selection rules the directive enforces
 - **System of record wins.** Calendar questions → Calendar; email → Gmail; chat →
   Google Chat. The (optional) vector store is supplementary discovery only.

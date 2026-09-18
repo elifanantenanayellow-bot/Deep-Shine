@@ -15,6 +15,7 @@ to be built by hand. Every file is a complete, validated n8n export.
 | Notion (utility/test) | `rayah-notion.json` | `rayah-notion.min.json` | Standalone Notion integration test / sub-workflow. |
 | Google Sheets (utility/test) | `rayah-sheets.json` | `rayah-sheets.min.json` | Standalone Sheets integration test / sub-workflow. |
 | Automation Runner | `rayah-automation-runner.json` | `rayah-automation-runner.min.json` | Polls the `Automations` sheet and fires due automations through the Brain. |
+| Error Handler | `rayah-error-handler.json` | `rayah-error-handler.min.json` | Set as the Error Workflow on the others; reports failures via the Brain. |
 
 **Two ways to import each file:**
 - **Import from File:** n8n → *Workflows* → *⋯* → *Import from File* → pick the `.json`.
@@ -78,6 +79,21 @@ The `Automations` tab is the store behind "create an automation": the Brain's
 **Create Automation (L2)** tool writes rows here; the **Automation Runner** reads them each
 minute, fires rows whose `next_run` is due (in `AUTOMATION` mode), reschedules recurring
 ones, and marks one-offs completed.
+
+## Step 8b — Configure Google Drive
+In the Brain's **Google Drive — Search Files (L1)** tool, select your **Google Drive
+OAuth2** credential (placeholder `REPLACE_DRIVE_CRED`). Read-only; used to find files
+related to an event.
+
+## Step 8c — Configure the Error Handler (reliability)
+Import `rayah-error-handler.json` and point its **Call Rayah Brain** node at the Brain.
+Then, on each other workflow, open **Settings → Error Workflow** and choose
+*Rayah — Error Handler*. On any failure n8n calls it; it normalizes the error (no
+secrets) and asks the Brain to report it to chat and, when safe, propose a low-risk fix.
+Network-dependent nodes (outbound WhatsApp/Chat sends, the Automation Runner's Sheets +
+Brain calls, every observation workflow's Brain call) already carry
+`retryOnFail` (3 tries, 2s backoff); the send nodes also continue-on-error so a failed
+send still reaches the observability log.
 
 ## Step 9 — Configure memory
 The Brain's **Short-Term Memory** (window buffer) keys sessions per channel via
@@ -160,6 +176,8 @@ confirm those credentials, then the interactive chat, then the observation chann
 | `REPLACE_GCHAT_CRED` | Google Chat nodes | Google Chat OAuth2 credential |
 | `REPLACE_NOTION_CRED` | Notion nodes | Notion credential |
 | `REPLACE_SHEETS_CRED` | Sheets nodes | Google Sheets OAuth2 credential |
+| `REPLACE_DRIVE_CRED` | Drive search tool | Google Drive OAuth2 credential |
+| `REPLACE_N8N_API_HEADER_CRED` | `n8n — …` tools | Header Auth credential (`X-N8N-API-KEY`) |
 | `REPLACE_WHATSAPP_CRED` / `REPLACE_WHATSAPP_TRIGGER_CRED` | WhatsApp nodes | WhatsApp credentials |
 | `REPLACE_BRAIN_WORKFLOW_ID` | *Call Rayah Brain* in the 4 observation workflows | the Brain's workflow id |
 | `WHATSAPP_PHONE_NUMBER_ID`, `RAYAH_SHEET_ID` | env vars | your values |

@@ -233,6 +233,25 @@ until you run the harness against your instance.**
   rather than creating a duplicate.
 - **Actual:** ______  **Pass/Fail:** ___
 
+### T31 — Google Drive search
+- **Input (chat):** "Find my file about the Q4 budget in Drive."
+- **Expected:** Brain → Drive search → lists matching files; "nothing found" if absent.
+- **Actual:** ______  **Pass/Fail:** ___
+
+### T32 — Error handler / failure reporting
+- **Input:** Set *Rayah — Error Handler* as the Error Workflow on (say) `rayah-gmail`,
+  then force a failure (e.g. a disconnected credential) and let it run.
+- **Expected:** n8n calls the Error Handler → normalizes the error (no secrets) → Brain
+  reports the failing workflow/node/reason to chat and proposes a low-risk fix.
+  *(The normalizer logic is runtime-verified by `tests/logic_test.mjs` T-error-norm.)*
+- **Actual:** ______  **Pass/Fail:** ___
+
+### T33 — Retry / transient failure
+- **Input:** Cause a transient outbound send failure (e.g. brief network blip).
+- **Expected:** The send node retries (3 tries, 2s backoff) and then continues to the
+  observability log rather than aborting the run.
+- **Actual:** ______  **Pass/Fail:** ___
+
 ### T30 — Brain-protection guard (safety)
 - **Input:** Any request that would modify/deactivate/delete the workflow whose id is
   `RAYAH_BRAIN_WORKFLOW_ID`.

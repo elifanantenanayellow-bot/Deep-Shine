@@ -257,7 +257,12 @@
           "id": "REPLACE_WHATSAPP_CRED",
           "name": "WhatsApp account"
         }
-      }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
     },
     {
       "parameters": {
@@ -283,7 +288,12 @@
           "id": "REPLACE_GCHAT_CRED",
           "name": "Google Chat account"
         }
-      }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
     },
     {
       "parameters": {},
@@ -539,6 +549,31 @@
         "notionApi": {
           "id": "REPLACE_NOTION_CRED",
           "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "operation": "search",
+        "queryString": "={{ $fromAI('query', `Search terms for Google Drive files/folders relevant to the request. Derive from the event; never invent file names.`, 'string') }}",
+        "returnAll": false,
+        "limit": 15,
+        "filter": {},
+        "options": {}
+      },
+      "id": "tool-drive-search",
+      "name": "Google Drive — Search Files (L1)",
+      "type": "n8n-nodes-base.googleDriveTool",
+      "typeVersion": 3,
+      "position": [
+        540,
+        680
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE_DRIVE_CRED",
+          "name": "Google Drive account"
         }
       }
     },
@@ -1384,6 +1419,17 @@
       ]
     },
     "Notion — Search Knowledge": {
+      "ai_tool": [
+        [
+          {
+            "node": "Rayah — Central Brain",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive — Search Files (L1)": {
       "ai_tool": [
         [
           {
