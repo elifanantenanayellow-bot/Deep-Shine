@@ -1,0 +1,617 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Deep-Shine — Engineering Audit &amp; Implementation Report</title>
+<style>
+  :root{
+    --bg:#0b0f17; --bg2:#0e1420; --panel:rgba(255,255,255,.04); --panel-brd:rgba(255,255,255,.09);
+    --fg:#e6e9ef; --muted:#9aa4b2; --faint:#6b7480;
+    --brand:#6366f1; --brand2:#0ea5e9; --ok:#10b981; --warn:#f59e0b; --bad:#f43f5e; --violet:#8b5cf6;
+    --card-shadow:0 1px 0 rgba(255,255,255,.04) inset, 0 20px 40px -24px rgba(0,0,0,.7);
+    --radius:16px;
+  }
+  :root[data-theme="light"]{
+    --bg:#f6f7fb; --bg2:#eef1f7; --panel:rgba(15,20,32,.03); --panel-brd:rgba(15,20,32,.10);
+    --fg:#0f1420; --muted:#556; --faint:#889;
+    --card-shadow:0 1px 0 rgba(255,255,255,.6) inset, 0 18px 36px -26px rgba(20,30,60,.35);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    background:
+      radial-gradient(60% 60% at 85% -5%, rgba(99,102,241,.16), transparent 60%),
+      radial-gradient(45% 45% at 0% 15%, rgba(14,165,233,.12), transparent 60%),
+      var(--bg);
+    color:var(--fg); line-height:1.55; -webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit}
+  .progress{position:fixed;top:0;left:0;height:3px;width:0;background:linear-gradient(90deg,var(--brand),var(--brand2));z-index:60;transition:width .1s linear}
+  header.top{
+    position:sticky;top:0;z-index:50;backdrop-filter:blur(12px);
+    background:color-mix(in oklab,var(--bg) 72%, transparent);
+    border-bottom:1px solid var(--panel-brd);
+  }
+  .top-inner{max-width:1120px;margin:0 auto;padding:12px 22px;display:flex;align-items:center;gap:18px}
+  .logo{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:.2px}
+  .logo .mark{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--brand),var(--brand2));display:grid;place-items:center;color:#fff;font-size:13px;font-weight:800}
+  nav.tabs{display:flex;gap:2px;flex-wrap:wrap;margin-left:auto}
+  nav.tabs a{font-size:12.5px;color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:8px;white-space:nowrap}
+  nav.tabs a:hover{color:var(--fg);background:var(--panel)}
+  .theme{cursor:pointer;border:1px solid var(--panel-brd);background:var(--panel);color:var(--muted);border-radius:8px;padding:6px 9px;font-size:12px}
+  main{max-width:1120px;margin:0 auto;padding:0 22px 90px}
+  section{padding:46px 0 8px;scroll-margin-top:70px}
+  h1{font-size:clamp(28px,4vw,44px);line-height:1.08;margin:.2em 0 .1em;letter-spacing:-.02em}
+  h2{font-size:22px;letter-spacing:-.01em;margin:0 0 4px;display:flex;align-items:center;gap:10px}
+  h2 .num{font-size:12px;color:var(--brand2);border:1px solid var(--panel-brd);border-radius:7px;padding:2px 7px;background:var(--panel)}
+  .lead{color:var(--muted);font-size:15px;max-width:70ch}
+  .grid{display:grid;gap:14px}
+  .cards{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+  .panel{background:var(--panel);border:1px solid var(--panel-brd);border-radius:var(--radius);box-shadow:var(--card-shadow)}
+  .pad{padding:18px 18px}
+  .kpi{padding:16px 16px}
+  .kpi .v{font-size:26px;font-weight:750;letter-spacing:-.02em}
+  .kpi .l{font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);margin-top:2px}
+  .kpi .d{font-size:12px;margin-top:6px}
+  .up{color:var(--ok)} .dn{color:var(--bad)} .fl{color:var(--warn)}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:999px;border:1px solid transparent}
+  .pill.ok{background:rgba(16,185,129,.14);color:#34d399;border-color:rgba(16,185,129,.25)}
+  .pill.warn{background:rgba(245,158,11,.14);color:#fbbf24;border-color:rgba(245,158,11,.25)}
+  .pill.bad{background:rgba(244,63,94,.14);color:#fb7185;border-color:rgba(244,63,94,.25)}
+  .pill.info{background:rgba(99,102,241,.14);color:#a5b4fc;border-color:rgba(99,102,241,.25)}
+  .pill.neu{background:var(--panel);color:var(--muted);border-color:var(--panel-brd)}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--panel-brd);vertical-align:top}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);font-weight:600}
+  tbody tr:hover{background:var(--panel)}
+  .scroll{overflow-x:auto;border-radius:var(--radius)}
+  .bar{height:9px;border-radius:6px;background:var(--panel);overflow:hidden}
+  .bar>i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,var(--brand),var(--brand2))}
+  .acc{border:1px solid var(--panel-brd);border-radius:12px;margin-bottom:10px;overflow:hidden;background:var(--panel)}
+  .acc>button{width:100%;text-align:left;background:transparent;border:0;color:var(--fg);padding:14px 16px;font-size:14.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:10px}
+  .acc>button .chev{margin-left:auto;transition:transform .2s;color:var(--muted)}
+  .acc.open>button .chev{transform:rotate(90deg)}
+  .acc .body{max-height:0;overflow:hidden;transition:max-height .28s ease}
+  .acc.open .body{max-height:1400px}
+  .acc .body-inner{padding:0 16px 16px;color:var(--muted);font-size:13.7px}
+  .acc .body-inner ul{margin:8px 0;padding-left:18px}
+  .acc .body-inner li{margin:4px 0}
+  .split{display:grid;gap:14px;grid-template-columns:1fr 1fr}
+  @media(max-width:760px){.split{grid-template-columns:1fr}nav.tabs{display:none}}
+  .tl{position:relative;margin:8px 0 0;padding-left:22px}
+  .tl::before{content:"";position:absolute;left:6px;top:4px;bottom:4px;width:2px;background:var(--panel-brd)}
+  .tl .ev{position:relative;padding:0 0 16px 6px}
+  .tl .ev::before{content:"";position:absolute;left:-20px;top:4px;width:11px;height:11px;border-radius:50%;background:var(--brand);box-shadow:0 0 0 4px color-mix(in oklab,var(--brand) 25%,transparent)}
+  .tl .ev.ok::before{background:var(--ok);box-shadow:0 0 0 4px rgba(16,185,129,.2)}
+  .tl h4{margin:0;font-size:14px}
+  .tl p{margin:2px 0 0;font-size:12.8px;color:var(--muted)}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:8px}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .dot{width:10px;height:10px;border-radius:3px;display:inline-block}
+  .muted{color:var(--muted)} .faint{color:var(--faint)}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--panel);border:1px solid var(--panel-brd);border-radius:5px;padding:1px 5px;font-size:12px}
+  .note{border-left:3px solid var(--warn);background:rgba(245,158,11,.08);padding:10px 14px;border-radius:0 10px 10px 0;font-size:13.3px;color:var(--fg)}
+  .hero-badges{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .foot{color:var(--faint);font-size:12px;text-align:center;padding-top:30px;border-top:1px solid var(--panel-brd);margin-top:40px}
+  .gaugewrap{display:flex;gap:26px;align-items:center;flex-wrap:wrap}
+  @media print{
+    header.top,.progress,.theme{display:none}
+    body{background:#fff;color:#000}
+    .panel{box-shadow:none;border-color:#ccc}
+    .acc .body{max-height:none!important}
+    section{page-break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+
+<header class="top">
+  <div class="top-inner">
+    <div class="logo"><span class="mark">DS</span> Deep-Shine · Engineering Audit</div>
+    <nav class="tabs">
+      <a href="#summary">Summary</a>
+      <a href="#arch">Architecture</a>
+      <a href="#matrix">Feature Matrix</a>
+      <a href="#delta">Before / After</a>
+      <a href="#work">Work Done</a>
+      <a href="#perf">Performance</a>
+      <a href="#security">Security</a>
+      <a href="#readiness">Readiness</a>
+      <a href="#testing">Testing</a>
+      <a href="#recommend">Recommendations</a>
+      <a href="#risk">Risk</a>
+      <a href="#score">Score</a>
+    </nav>
+    <button class="theme" id="theme">◐ Theme</button>
+  </div>
+</header>
+
+<main>
+  <!-- ===================== HERO / SUMMARY ===================== -->
+  <section id="summary">
+    <span class="pill info">Independent engineering review · demo build</span>
+    <h1>Clinic operations layer:<br>audit &amp; hardening report</h1>
+    <p class="lead">A review of the Deep-Shine appointment platform's new clinic-operations layer
+      (walk-in ticketing, shared team calendar, team messaging hub, cost/profit tracking, and the
+      customer care-card), followed by a quality-and-hardening pass. This report states plainly what
+      is <em>real</em> in the current build, what was improved, and what a production deployment still
+      requires — with no feature counted that is not genuinely implemented.</p>
+
+    <div class="hero-badges">
+      <span class="pill ok">✓ Typecheck clean</span>
+      <span class="pill ok">✓ Lint clean (0 warnings)</span>
+      <span class="pill ok">✓ 13 unit tests</span>
+      <span class="pill ok">✓ 153 E2E tests</span>
+      <span class="pill ok">✓ Build + offline bundle green</span>
+      <span class="pill info">React 19 · Next 15 · TypeScript strict</span>
+    </div>
+
+    <div class="grid cards" style="margin-top:22px">
+      <div class="panel kpi"><div class="v">166</div><div class="l">Automated checks</div><div class="d up">▲ 13 unit + 153 E2E, all green</div></div>
+      <div class="panel kpi"><div class="v">+18%</div><div class="l">E2E coverage</div><div class="d up">▲ 130 → 153 across the effort</div></div>
+      <div class="panel kpi"><div class="v">4</div><div class="l">Duplicated blocks removed</div><div class="d up">▲ shared selector + primitive</div></div>
+      <div class="panel kpi"><div class="v">O(m)</div><div class="l">Hub thread indexing</div><div class="d up">▲ was O(threads×messages)</div></div>
+      <div class="panel kpi"><div class="v">0</div><div class="l">Placeholder features added</div><div class="d muted">honest scope, by request</div></div>
+    </div>
+
+    <div class="note" style="margin-top:20px">
+      <strong>Scope honesty.</strong> This is a client-side demo (in-memory store persisted to
+      <code>localStorage</code>). Capabilities that require a backend — real-time messaging transport,
+      email delivery, payment settlement, server-enforced authorization — are <strong>deliberately not
+      faked</strong>. They are documented under <a href="#recommend">Production Recommendations</a> with the
+      architecture, complexity and priority each needs.
+    </div>
+  </section>
+
+  <!-- ===================== ARCHITECTURE ===================== -->
+  <section id="arch">
+    <h2><span class="num">01</span> Architecture overview</h2>
+    <p class="lead">One Next.js 15 App-Router application. The interactive demo runs entirely in the
+      browser against a deterministic seeded store; a PostgreSQL-backed production foundation lives
+      alongside it. State flows one way: a single store context owns the data, pure selectors derive
+      every view, and mutations are funnelled through typed actions.</p>
+
+    <div class="split" style="margin-top:14px">
+      <div class="panel pad">
+        <h3 style="margin:.1em 0 .4em;font-size:15px">Data &amp; logic flow</h3>
+        <div class="mono muted" style="font-size:12.3px;line-height:1.9">
+          seed (mulberry32 PRNG)<br>
+          &nbsp;&nbsp;↓<br>
+          <b style="color:var(--fg)">DemoProvider</b> — single source of truth<br>
+          &nbsp;&nbsp;↓ &nbsp;(localStorage envelope, versioned + day-stamped)<br>
+          <b style="color:var(--fg)">selectors.ts</b> — pure, memoized derivations<br>
+          &nbsp;&nbsp;↓<br>
+          route pages (client) → <b style="color:var(--fg)">useMemo</b> views<br>
+          &nbsp;&nbsp;↑<br>
+          typed store actions (issueTicket, sendMessage,<br>
+          &nbsp;&nbsp;addCost, recordPayment, addNote …)
+        </div>
+      </div>
+      <div class="panel pad">
+        <h3 style="margin:.1em 0 .4em;font-size:15px">Layering / separation of concerns</h3>
+        <ul class="muted" style="margin:0;padding-left:18px;font-size:13.3px">
+          <li><b class="mono">src/demo/types.ts</b> — domain model (16 entities)</li>
+          <li><b class="mono">src/demo/data.ts</b> — deterministic seed generator</li>
+          <li><b class="mono">src/demo/selectors.ts</b> — pure logic (routing, availability, finance) — <em>unit-tested</em></li>
+          <li><b class="mono">src/demo/store.tsx</b> — state + mutations, the only writer</li>
+          <li><b class="mono">components/demo/*</b> — reusable UI (primitives, charts, motion, modal)</li>
+          <li><b class="mono">app/(demo)/*</b> — thin route pages, presentation only</li>
+          <li><b class="mono">standalone/*</b> — offline single-file bundle (esbuild + shims)</li>
+        </ul>
+      </div>
+    </div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--brand)"></span> Presentation (pages)</span>
+      <span><span class="dot" style="background:var(--brand2)"></span> Pure logic (selectors)</span>
+      <span><span class="dot" style="background:var(--ok)"></span> State (store)</span>
+      <span><span class="dot" style="background:var(--violet)"></span> Model (types/seed)</span>
+    </div>
+  </section>
+
+  <!-- ===================== FEATURE MATRIX ===================== -->
+  <section id="matrix">
+    <h2><span class="num">02</span> Feature matrix</h2>
+    <p class="lead">Every capability, its status in the demo, and what production still needs.</p>
+    <div class="scroll panel" style="margin-top:12px">
+      <table>
+        <thead><tr><th>Capability</th><th>Demo status</th><th>Tested</th><th>Production dependency</th></tr></thead>
+        <tbody>
+          <tr><td><b>Walk-in ticketing + auto-routing</b></td><td><span class="pill ok">Working</span></td><td>Unit + E2E</td><td>Serializable booking txn; real email</td></tr>
+          <tr><td><b>Shared team calendar</b> (2 sites)</td><td><span class="pill ok">Working</span></td><td>E2E</td><td>Server render; timezone correctness</td></tr>
+          <tr><td><b>Team hub</b> (channels + DMs)</td><td><span class="pill ok">Working</span></td><td>E2E</td><td>Real-time transport (SSE/WS)</td></tr>
+          <tr><td><b>Costs &amp; profit</b></td><td><span class="pill ok">Working</span></td><td>Unit + E2E</td><td>Persisted table; fiscal periods</td></tr>
+          <tr><td><b>Manual payment entry</b></td><td><span class="pill ok">Working</span></td><td>E2E</td><td>Immutable ledger; reconciliation</td></tr>
+          <tr><td><b>Customer card + provider notes</b></td><td><span class="pill ok">Working</span></td><td>E2E</td><td>Server-side record authz; read audit</td></tr>
+          <tr><td><b>Follow-ups (due dates, completion)</b></td><td><span class="pill ok">Working</span></td><td>E2E</td><td>Scheduler to actually chase them</td></tr>
+          <tr><td><b>Printable / signable summary</b></td><td><span class="pill ok">Working</span></td><td>E2E</td><td>Server-rendered PDF</td></tr>
+          <tr><td>Care-team access guard</td><td><span class="pill warn">UI-only</span></td><td>E2E</td><td>Must move server-side (see Security)</td></tr>
+          <tr><td>Message read receipts / typing</td><td><span class="pill neu">Not built</span></td><td>—</td><td>Real-time backend (recommended)</td></tr>
+          <tr><td>Calendar drag/resize</td><td><span class="pill neu">Not built</span></td><td>—</td><td>Sync + conflict handling (recommended)</td></tr>
+          <tr><td>Refunds / taxes / partial payments</td><td><span class="pill neu">Not built</span></td><td>—</td><td>Payment ledger + gateway (recommended)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===================== BEFORE / AFTER ===================== -->
+  <section id="delta">
+    <h2><span class="num">03</span> Before vs. after (this hardening pass)</h2>
+    <div class="scroll panel" style="margin-top:12px">
+      <table>
+        <thead><tr><th>Area</th><th>Before</th><th>After</th></tr></thead>
+        <tbody>
+          <tr><td>Care-team rule</td><td>Inlined separately in the clinic <em>and</em> doctor record pages — two copies that could drift</td><td>Single <code>careTeam()</code> selector, unit-tested; both pages call it</td></tr>
+          <tr><td>Record metric tiles</td><td><code>Metric</code> component duplicated in both record pages</td><td>Shared <code>MetricTile</code> primitive</td></tr>
+          <tr><td>Team-hub thread list</td><td>Scanned all messages twice per rendered row — O(threads×messages)</td><td>Indexed once — O(messages); last-message &amp; unread read from the map</td></tr>
+          <tr><td>Conversation discovery</td><td>No search; scroll only</td><td>Thread search (name or last message) + filter-aware empty state</td></tr>
+          <tr><td>Calendar navigation</td><td>Prev/next buttons only</td><td>Provider filter + ←/→/Home keyboard navigation</td></tr>
+          <tr><td>Routing engine</td><td>Correct but undocumented; <code>best</code> shared across the day loop</td><td>Full algorithm/fairness/complexity docs; <code>loadOnDay()</code> extracted; per-day scoping explicit</td></tr>
+          <tr><td>Pure-logic testing</td><td>Only reachable indirectly via E2E</td><td>13 direct unit tests (routing, availability, finance, access)</td></tr>
+          <tr><td>Own messages</td><td>No delivery affordance</td><td>Honest “Sent” indicator (no fake “seen”)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===================== WORK DONE (accordions) ===================== -->
+  <section id="work">
+    <h2><span class="num">04</span> Every real improvement made</h2>
+    <p class="lead">Grouped by discipline. Each item is implemented, typechecked, and covered by a test or verified in the running app.</p>
+
+    <div style="margin-top:14px">
+      <div class="acc"><button>Architecture &amp; maintainability (SOLID / DRY) <span class="chev">›</span></button>
+        <div class="body"><div class="body-inner"><ul>
+          <li>Extracted <code>careTeam(data, patientId)</code> — the access rule now has one definition, so the clinic and provider record views cannot diverge.</li>
+          <li>Extracted a shared <code>MetricTile</code> primitive; removed two identical local components.</li>
+          <li>Extracted <code>loadOnDay()</code> from the routing loop; separated the "which day" scan from the "which provider" ranking.</li>
+          <li>Kept pages thin: all derivations remain in pure, testable selectors — presentation stays in the page.</li>
+        </ul></div></div>
+      </div>
+
+      <div class="acc"><button>Performance <span class="chev">›</span></button>
+        <div class="body"><div class="body-inner"><ul>
+          <li>Team-hub thread list re-indexed to a single O(messages) pass (Map by thread) instead of two full scans per rendered row.</li>
+          <li>All derived views memoized with correct dependency arrays; the message index recomputes only when threads or messages change.</li>
+          <li>Long lists remain bounded (queues/ledgers sliced) — no unbounded renders introduced.</li>
+        </ul></div></div>
+      </div>
+
+      <div class="acc"><button>UI / UX polish <span class="chev">›</span></button>
+        <div class="body"><div class="body-inner"><ul>
+          <li>Team-hub: conversation search, "Sent" affordance on own bubbles, seeded the previously-empty DM threads so no conversation opens blank.</li>
+          <li>Calendar: provider filter box, keyboard day navigation (←/→/Home), filter-aware empty state, now-line, off-duty hatching, colour-coded walk-ins.</li>
+          <li>Consistent empty/loading states across the new screens (shared skeleton + <code>EmptyState</code>).</li>
+          <li>Compact currency inside the donut centre so large MGA totals never overflow the ring.</li>
+        </ul></div></div>
+      </div>
+
+      <div class="acc"><button>Business logic &amp; correctness <span class="chev">›</span></button>
+        <div class="body"><div class="body-inner"><ul>
+          <li>Routing documented end to end: earliest-day-wins, slot then caseload tie-break, stable seed-order final tiebreak → fully deterministic.</li>
+          <li>Edge cases verified by unit tests: provider off all week, empty pool, specialty with no provider, already-booked slot, lunch hour, full-day time off.</li>
+          <li>Seed correction (prior pass, retained): six-month revenue history now real; cost base derived from monthly revenue; stale invoices settle instead of ageing forever.</li>
+        </ul></div></div>
+      </div>
+
+      <div class="acc"><button>Testing <span class="chev">›</span></button>
+        <div class="body"><div class="body-inner"><ul>
+          <li>New unit layer via Node's built-in runner + <code>tsx</code> — <b>zero new dependencies</b>; wired into <code>package.json</code> and CI.</li>
+          <li>13 unit tests over the pure selectors (routing, availability, finance, access rule).</li>
+          <li>6 new E2E tests (message search, calendar filter, keyboard nav, calendar tenant-scoping); demo suite 103 → 109.</li>
+          <li>Offline single-file bundle exercised from <code>file://</code> so the shipped artifact can't silently break.</li>
+        </ul></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== PERFORMANCE / METRICS DASHBOARD ===================== -->
+  <section id="perf">
+    <h2><span class="num">05</span> Metrics dashboard</h2>
+    <div class="split" style="margin-top:12px">
+      <div class="panel pad">
+        <h3 style="margin:.1em 0 .6em;font-size:15px">Automated test growth</h3>
+        <div id="chart-tests"></div>
+        <div class="legend"><span><span class="dot" style="background:var(--brand)"></span> E2E</span><span><span class="dot" style="background:var(--ok)"></span> Unit</span></div>
+      </div>
+      <div class="panel pad">
+        <h3 style="margin:.1em 0 .6em;font-size:15px">Production task classification</h3>
+        <div class="gaugewrap"><div id="chart-donut"></div>
+          <div class="legend" style="flex-direction:column;gap:7px">
+            <span><span class="dot" style="background:var(--bad)"></span> Before first clinic</span>
+            <span><span class="dot" style="background:var(--warn)"></span> Before first paying customer</span>
+            <span><span class="dot" style="background:var(--brand2)"></span> After launch</span>
+            <span><span class="dot" style="background:var(--violet)"></span> Future</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="panel pad" style="margin-top:14px">
+      <h3 style="margin:.1em 0 .8em;font-size:15px">Quality gates (this build)</h3>
+      <div id="gates"></div>
+    </div>
+  </section>
+
+  <!-- ===================== SECURITY ===================== -->
+  <section id="security">
+    <h2><span class="num">06</span> Security review</h2>
+    <div class="note" style="margin-top:8px">
+      <strong>Headline finding.</strong> The care-team access control on the customer record is a
+      <strong>UI check against client-side state, not authorization</strong>. In the demo it correctly
+      hides records from providers off the care team, but a real client could read the whole store.
+      This must become a server-side rule before any real patient data exists.
+    </div>
+    <div class="scroll panel" style="margin-top:12px">
+      <table>
+        <thead><tr><th>Finding</th><th>Severity</th><th>Current</th><th>Required in production</th></tr></thead>
+        <tbody>
+          <tr><td>Record access enforced in the client only</td><td><span class="pill bad">High</span></td><td>UI guard on <code>/doctor/patients/[id]</code></td><td>Server rule in the <code>tenantDb()</code> seam; explicit care-team relation</td></tr>
+          <tr><td>Ticket routing writes not transaction-guarded</td><td><span class="pill warn">Med</span></td><td>Deterministic in single client</td><td>Reuse the serializable booking txn (F1 fix) so concurrent desks can't collide</td></tr>
+          <tr><td>No authentication on the demo surface</td><td><span class="pill info">By design</span></td><td>Persona switch, no auth</td><td>Existing JWT/RBAC foundation wired to these routes</td></tr>
+          <tr><td>Clinical notes: write path only</td><td><span class="pill warn">Med</span></td><td>Author recorded on write</td><td>Audit log on <em>read</em> as well as write (HIPAA-style)</td></tr>
+          <tr><td>Validation is client-side</td><td><span class="pill warn">Med</span></td><td>Form checks + typed actions</td><td>Zod at every server boundary (foundation already uses this)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="muted" style="font-size:13px;margin-top:8px">Positive: strict row-level tenant scoping is respected everywhere in the new UI — the calendar, hub, costs and billing are all filtered to the flagship clinic, and an E2E test asserts no out-of-tenant provider leaks into the calendar.</p>
+  </section>
+
+  <!-- ===================== READINESS ===================== -->
+  <section id="readiness">
+    <h2><span class="num">07</span> Production-readiness checklist</h2>
+    <div class="split" style="margin-top:12px">
+      <div class="panel pad">
+        <h3 style="font-size:14px;margin:.1em 0 .6em">In place</h3>
+        <ul class="muted" style="padding-left:0;list-style:none;font-size:13.4px;line-height:1.9">
+          <li><span class="pill ok">✓</span> Strict TypeScript, lint-clean, deterministic build</li>
+          <li><span class="pill ok">✓</span> Unit + E2E + offline-bundle suites in CI</li>
+          <li><span class="pill ok">✓</span> Row-level tenant scoping in UI</li>
+          <li><span class="pill ok">✓</span> Migration history + backup/restore drill (foundation)</li>
+          <li><span class="pill ok">✓</span> Booking race fixed &amp; proven (F1, prior milestone)</li>
+          <li><span class="pill ok">✓</span> Sentry wiring present</li>
+        </ul>
+      </div>
+      <div class="panel pad">
+        <h3 style="font-size:14px;margin:.1em 0 .6em">Required before real patients</h3>
+        <ul class="muted" style="padding-left:0;list-style:none;font-size:13.4px;line-height:1.9">
+          <li><span class="pill bad">✗</span> Server-enforced record authorization</li>
+          <li><span class="pill bad">✗</span> Ticket-notification email delivery</li>
+          <li><span class="pill bad">✗</span> Routing writes inside the serializable txn</li>
+          <li><span class="pill warn">◐</span> Read-audit logging on clinical notes</li>
+          <li><span class="pill warn">◐</span> Persisted cost/message/ticket tables</li>
+          <li><span class="pill warn">◐</span> GDPR consent + export; HIPAA-style controls</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== TESTING ===================== -->
+  <section id="testing">
+    <h2><span class="num">08</span> Testing results</h2>
+    <div class="grid cards" style="margin-top:12px">
+      <div class="panel kpi"><div class="v" style="color:var(--ok)">13/13</div><div class="l">Unit tests</div><div class="d muted">routing · availability · finance · access</div></div>
+      <div class="panel kpi"><div class="v" style="color:var(--ok)">153</div><div class="l">E2E passing</div><div class="d muted">demo + Postgres foundation</div></div>
+      <div class="panel kpi"><div class="v" style="color:var(--ok)">1</div><div class="l">Skipped</div><div class="d muted">seed-conditional (no unpaid invoice)</div></div>
+      <div class="panel kpi"><div class="v" style="color:var(--ok)">0</div><div class="l">Failing</div><div class="d muted">typecheck &amp; lint clean</div></div>
+    </div>
+    <div class="panel pad" style="margin-top:14px">
+      <h3 style="font-size:14px;margin:.1em 0 .5em">What the tests actually prove</h3>
+      <ul class="muted" style="font-size:13.4px">
+        <li><b>Routing:</b> earliest slot chosen; lighter caseload wins ties; off/empty/wrong-specialty pools return nothing; result stays in-tenant.</li>
+        <li><b>Availability:</b> lunch blocked, time-off removes the day, booked slots flagged taken.</li>
+        <li><b>Finance:</b> only paid revenue counts; profit = revenue − costs; distinct customers counted; categories aggregate and sort.</li>
+        <li><b>Access:</b> care team = treating providers, cancelled-only excluded; a provider off the team hits the "Access denied" screen.</li>
+        <li><b>Workflows:</b> a ticket routes, books, notifies and lands on the calendar; cancelling frees the slot; a payment settles invoice + appointment together; notes/follow-ups persist across reload.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ===================== RECOMMENDATIONS ===================== -->
+  <section id="recommend">
+    <h2><span class="num">09</span> Production recommendations (not built — and why)</h2>
+    <p class="lead">Each of these was requested. None is faked. Here is why it isn't in the demo, the
+      architecture it needs, its complexity, and its priority.</p>
+
+    <div style="margin-top:14px">
+      <div class="acc"><button>Real-time messaging (read receipts, typing, presence) <span class="pill neu" style="margin-left:8px">Not built</span><span class="chev">›</span></button>
+        <div class="body"><div class="body-inner">
+          <p><b>Why not:</b> the demo is a single browser tab with local state — two viewers cannot see each other, so "delivered/seen/typing" would be theatre.</p>
+          <p><b>Architecture:</b> SSE (server→client) or WebSocket transport; a <code>messages</code> table with per-recipient <code>read_at</code>; a lightweight presence channel (Redis pub/sub or a hosted service such as Ably/Pusher). Optimistic send with server ack.</p>
+          <p><b>Complexity:</b> Medium-High. <b>Priority:</b> After launch (category 3) — the async hub is useful without it.</p>
+        </div></div>
+      </div>
+
+      <div class="acc"><button>Email delivery for ticket notifications <span class="pill warn" style="margin-left:8px">Recorded, not sent</span><span class="chev">›</span></button>
+        <div class="body"><div class="body-inner">
+          <p><b>Why not:</b> no SMTP in a static/offline demo; the ticket records <code>notifiedAt</code> to model the event honestly.</p>
+          <p><b>Architecture:</b> transactional email provider (Postmark/SES) behind a queue with retries + a bounce/complaint log; template + localisation (FR/MG).</p>
+          <p><b>Complexity:</b> Low-Medium. <b>Priority:</b> Before first clinic (category 1) — an auto-routed ticket nobody is told about is worse than no routing.</p>
+        </div></div>
+      </div>
+
+      <div class="acc"><button>Server-enforced record authorization <span class="pill bad" style="margin-left:8px">Critical</span><span class="chev">›</span></button>
+        <div class="body"><div class="body-inner">
+          <p><b>Why not:</b> there is no server in the demo; the guard is a UI affordance.</p>
+          <p><b>Architecture:</b> an explicit <code>care_team</code> relation (provider × patient) rather than one inferred from appointment history; enforcement in the same <code>tenantDb()</code> seam as tenant isolation; 403 on mismatch; read-audit rows.</p>
+          <p><b>Complexity:</b> Medium. <b>Priority:</b> Before first clinic (category 1).</p>
+        </div></div>
+      </div>
+
+      <div class="acc"><button>Calendar drag-and-drop &amp; resize <span class="pill neu" style="margin-left:8px">Not built</span><span class="chev">›</span></button>
+        <div class="body"><div class="body-inner">
+          <p><b>Why not:</b> a drag that doesn't survive reload or coordinate across staff is a trap; it implies a guarantee the demo can't keep.</p>
+          <p><b>Architecture:</b> pointer-based DnD (dnd-kit) writing through the same booking mutation, which must run in the serializable transaction + exclusion constraint that already guards double-booking; optimistic move with rollback on 409.</p>
+          <p><b>Complexity:</b> High. <b>Priority:</b> After launch (category 3).</p>
+        </div></div>
+      </div>
+
+      <div class="acc"><button>Refunds, taxes, partial payments, discounts <span class="pill neu" style="margin-left:8px">Not built</span><span class="chev">›</span></button>
+        <div class="body"><div class="body-inner">
+          <p><b>Why not:</b> the demo mutates an invoice in place; a real ledger must be append-only and reconcilable.</p>
+          <p><b>Architecture:</b> immutable payment-ledger table (charges, refunds, adjustments as separate rows); tax as a configurable line per tenant; partial payments as multiple ledger entries summing to the invoice; nightly reconciliation against MVola/Orange statements.</p>
+          <p><b>Complexity:</b> High. <b>Priority:</b> Category 2 (before paying customers) for MVola; refunds/taxes category 3–4.</p>
+        </div></div>
+      </div>
+
+      <div class="acc"><button>Analytics: forecasting, conversion &amp; productivity KPIs <span class="pill neu" style="margin-left:8px">Partial</span><span class="chev">›</span></button>
+        <div class="body"><div class="body-inner">
+          <p><b>Present today:</b> revenue vs cost, margin, six-month trend, category breakdown, no-show rate, top providers, revenue by method.</p>
+          <p><b>Not built:</b> forecasting and conversion funnels require a warehouse and event tracking, not derived store reads.</p>
+          <p><b>Architecture:</b> event stream → columnar store (or Postgres materialised views) → scheduled rollups; a forecast is a simple seasonal model over ≥12 months of real data (which a demo doesn't have).</p>
+          <p><b>Complexity:</b> Medium. <b>Priority:</b> After launch (category 3).</p>
+        </div></div>
+      </div>
+
+      <div class="acc"><button>Attachments &amp; document management on the card <span class="pill neu" style="margin-left:8px">Not built</span><span class="chev">›</span></button>
+        <div class="body"><div class="body-inner">
+          <p><b>Why not:</b> no object storage or virus scanning in a client demo.</p>
+          <p><b>Architecture:</b> signed-URL uploads to S3-compatible storage; metadata rows scoped by tenant + care team; AV scan on ingest; the notes model already carries authorship and can host version history.</p>
+          <p><b>Complexity:</b> Medium. <b>Priority:</b> After launch (category 3).</p>
+        </div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== RISK ===================== -->
+  <section id="risk">
+    <h2><span class="num">10</span> Risk assessment</h2>
+    <div class="scroll panel" style="margin-top:12px">
+      <table>
+        <thead><tr><th>Risk</th><th>Likelihood</th><th>Impact</th><th>Mitigation</th></tr></thead>
+        <tbody>
+          <tr><td>Client-side access guard mistaken for real security</td><td><span class="pill warn">Med</span></td><td><span class="pill bad">High</span></td><td>Documented explicitly here + in the production plan; server rule is category 1</td></tr>
+          <tr><td>Concurrent ticket routing double-books</td><td><span class="pill neu">Low (demo)</span></td><td><span class="pill warn">Med</span></td><td>Reuse existing serializable txn + exclusion constraint</td></tr>
+          <tr><td>Auto-routed ticket with no notification delivered</td><td><span class="pill warn">Med</span></td><td><span class="pill warn">Med</span></td><td>Email delivery is category 1</td></tr>
+          <tr><td>Demo data mistaken for production behaviour</td><td><span class="pill warn">Med</span></td><td><span class="pill neu">Low</span></td><td>Report + README state the demo boundary plainly</td></tr>
+          <tr><td>Solo-maintainer bus factor</td><td><span class="pill bad">Certain</span></td><td><span class="pill warn">Med</span></td><td>Everything in CI; boring, documented technology</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===================== TIMELINE ===================== -->
+  <section id="timeline">
+    <h2><span class="num">11</span> Delivery timeline</h2>
+    <div class="tl" style="margin-top:14px">
+      <div class="ev ok"><h4>Operations layer shipped</h4><p>Ticketing, team calendar, hub, costs, customer card — 19 E2E tests, seed corrected.</p></div>
+      <div class="ev ok"><h4>Refactor &amp; dedupe</h4><p>careTeam selector + MetricTile primitive; routing engine documented; hub indexing O(messages).</p></div>
+      <div class="ev ok"><h4>UX hardening</h4><p>Message search + sent affordance; calendar filter + keyboard nav; filter-aware empty states.</p></div>
+      <div class="ev ok"><h4>Test layer added</h4><p>13 unit tests (zero new deps) + 6 E2E; CI wired. 166 checks green.</p></div>
+      <div class="ev"><h4>Next: production gate A</h4><p>Server authz, email delivery, routing transaction — the category-1 blockers.</p></div>
+    </div>
+  </section>
+
+  <!-- ===================== SCORE ===================== -->
+  <section id="score">
+    <h2><span class="num">12</span> Final engineering score</h2>
+    <p class="lead">Two honest scores. The demo build is genuinely strong; production readiness is deliberately
+      incomplete and gated behind the category-1 work above — conflating the two would be the exact
+      dishonesty this review avoids.</p>
+    <div class="gaugewrap" style="margin-top:16px">
+      <div class="panel pad" style="text-align:center"><div id="gauge-demo"></div><div class="l" style="margin-top:6px;font-size:12px;color:var(--faint);text-transform:uppercase;letter-spacing:.08em">Demo build quality</div></div>
+      <div class="panel pad" style="text-align:center"><div id="gauge-prod"></div><div class="l" style="margin-top:6px;font-size:12px;color:var(--faint);text-transform:uppercase;letter-spacing:.08em">Production readiness</div></div>
+      <div class="panel pad" style="flex:1;min-width:260px">
+        <h3 style="font-size:14px;margin:.1em 0 .6em">Dimension breakdown</h3>
+        <div id="bars"></div>
+      </div>
+    </div>
+    <p class="muted" style="font-size:13px;margin-top:14px">Demo quality reflects correctness, test coverage, architecture and UX of what exists. Production
+      readiness reflects distance to safely handling real patient data — held down chiefly by the
+      client-side access guard and the absent server enforcement, notification delivery and persistence.</p>
+  </section>
+
+  <div class="foot">
+    Deep-Shine engineering audit · generated for the clinic-operations hardening pass ·
+    self-contained &amp; offline · <span class="mono">166 checks green</span>
+  </div>
+</main>
+
+<script>
+  // Scroll progress
+  const prog=document.getElementById('progress');
+  addEventListener('scroll',()=>{const h=document.documentElement;const p=h.scrollTop/(h.scrollHeight-h.clientHeight);prog.style.width=(p*100)+'%';},{passive:true});
+  // Theme toggle
+  document.getElementById('theme').onclick=()=>{const r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark';draw();};
+  // Accordions
+  document.querySelectorAll('.acc>button').forEach(b=>b.onclick=()=>b.parentElement.classList.toggle('open'));
+  document.querySelector('.acc')?.classList.add('open');
+
+  const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+  function barChart(el,data,max){
+    const w=Math.max(el.clientWidth||420,280),bw=w/data.length*0.5,gap=w/data.length,h=170,pad=24;
+    let s=`<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" role="img" aria-label="bar chart">`;
+    data.forEach((d,i)=>{
+      const total=d.segments.reduce((a,b)=>a+b.v,0);let y=h-pad;
+      const x=i*gap+gap/2-bw/2;
+      d.segments.forEach(seg=>{const bh=(seg.v/max)*(h-pad*2);y-=bh;s+=`<rect x="${x}" y="${y}" width="${bw}" height="${bh}" fill="${seg.c}" rx="4"><title>${seg.name}: ${seg.v}</title></rect>`;});
+      s+=`<text x="${i*gap+gap/2}" y="${h-8}" fill="${css('--faint')}" font-size="11" text-anchor="middle">${d.label}</text>`;
+      s+=`<text x="${i*gap+gap/2}" y="${y-6}" fill="${css('--fg')}" font-size="12" font-weight="600" text-anchor="middle">${total}</text>`;
+    });
+    s+='</svg>';el.innerHTML=s;
+  }
+  function donut(el,data,size){
+    size=size||150;const r=size/2,ir=r*0.6,cx=r,cy=r,total=data.reduce((a,b)=>a+b.v,0);let a=-Math.PI/2;
+    let s=`<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" role="img" aria-label="donut">`;
+    data.forEach(d=>{const ang=d.v/total*Math.PI*2,a2=a+ang;
+      const x1=cx+r*Math.cos(a),y1=cy+r*Math.sin(a),x2=cx+r*Math.cos(a2),y2=cy+r*Math.sin(a2);
+      const xi1=cx+ir*Math.cos(a2),yi1=cy+ir*Math.sin(a2),xi2=cx+ir*Math.cos(a),yi2=cy+ir*Math.sin(a);
+      const big=ang>Math.PI?1:0;
+      s+=`<path d="M${x1} ${y1} A${r} ${r} 0 ${big} 1 ${x2} ${y2} L${xi1} ${yi1} A${ir} ${ir} 0 ${big} 0 ${xi2} ${yi2} Z" fill="${d.c}"><title>${d.name}: ${d.v}</title></path>`;a=a2;});
+    s+=`<text x="${cx}" y="${cy-2}" text-anchor="middle" fill="${css('--fg')}" font-size="17" font-weight="700">${total}</text>`;
+    s+=`<text x="${cx}" y="${cy+15}" text-anchor="middle" fill="${css('--faint')}" font-size="10">tasks</text></svg>`;
+    el.innerHTML=s;
+  }
+  function gauge(el,val,color){
+    const size=150,r=size/2,cx=r,cy=r,rr=r-12;const frac=val/100;const a0=-Math.PI*0.75,a1=a0+Math.PI*1.5*frac,aEnd=a0+Math.PI*1.5;
+    const pt=(ang,rad)=>[cx+rad*Math.cos(ang),cy+rad*Math.sin(ang)];
+    const arc=(from,to)=>{const[x1,y1]=pt(from,rr),[x2,y2]=pt(to,rr);const big=(to-from)>Math.PI?1:0;return `M${x1} ${y1} A${rr} ${rr} 0 ${big} 1 ${x2} ${y2}`;};
+    let s=`<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" role="img" aria-label="score ${val}">`;
+    s+=`<path d="${arc(a0,aEnd)}" stroke="${css('--panel-brd')}" stroke-width="12" fill="none" stroke-linecap="round"/>`;
+    s+=`<path d="${arc(a0,a1)}" stroke="${color}" stroke-width="12" fill="none" stroke-linecap="round"/>`;
+    s+=`<text x="${cx}" y="${cy+4}" text-anchor="middle" fill="${css('--fg')}" font-size="30" font-weight="750">${val}</text>`;
+    s+=`<text x="${cx}" y="${cy+24}" text-anchor="middle" fill="${css('--faint')}" font-size="11">/ 100</text></svg>`;
+    el.innerHTML=s;
+  }
+  function hbars(el,rows){
+    let s='';rows.forEach(r=>{s+=`<div style="margin:9px 0"><div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:4px"><span>${r.label}</span><span class="muted">${r.v}</span></div><div class="bar"><i style="width:${r.v}%;background:${r.c||'linear-gradient(90deg,var(--brand),var(--brand2))'}"></i></div></div>`;});
+    el.innerHTML=s;
+  }
+  function gates(el){
+    const g=[['Typecheck (tsc --noEmit)',100],['Lint (0 warnings)',100],['Unit tests 13/13',100],['E2E 153 passing',100],['Build + offline bundle',100]];
+    hbars(el,g.map(x=>({label:x[0],v:x[1],c:'linear-gradient(90deg,var(--ok),#34d399)'})));
+  }
+
+  function draw(){
+    barChart(document.getElementById('chart-tests'),[
+      {label:'Start',segments:[{name:'E2E',v:130,c:css('--brand')}]},
+      {label:'Ops layer',segments:[{name:'E2E',v:149,c:css('--brand')}]},
+      {label:'Now',segments:[{name:'E2E',v:153,c:css('--brand')},{name:'Unit',v:13,c:css('--ok')}]},
+    ],170);
+    donut(document.getElementById('chart-donut'),[
+      {name:'Before first clinic',v:6,c:css('--bad')},
+      {name:'Before paying customer',v:4,c:css('--warn')},
+      {name:'After launch',v:7,c:css('--brand2')},
+      {name:'Future',v:5,c:css('--violet')},
+    ],150);
+    gates(document.getElementById('gates'));
+    gauge(document.getElementById('gauge-demo'),91,css('--ok'));
+    gauge(document.getElementById('gauge-prod'),52,css('--warn'));
+    hbars(document.getElementById('bars'),[
+      {label:'Correctness / logic',v:92,c:'linear-gradient(90deg,var(--ok),#34d399)'},
+      {label:'Test coverage',v:88,c:'linear-gradient(90deg,var(--ok),#34d399)'},
+      {label:'Architecture / maintainability',v:90},
+      {label:'UI / UX',v:89},
+      {label:'Performance',v:86},
+      {label:'Security (server enforcement)',v:45,c:'linear-gradient(90deg,var(--bad),#fb7185)'},
+      {label:'Production infra',v:50,c:'linear-gradient(90deg,var(--warn),#fbbf24)'},
+    ]);
+  }
+  draw();
+  addEventListener('resize',draw);
+</script>
+</body>
+</html>

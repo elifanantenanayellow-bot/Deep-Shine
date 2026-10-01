@@ -1,0 +1,15 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "buildCommand": "next build",
+  "installCommand": "pnpm install --no-frozen-lockfile",
+  "regions": ["fra1"],
+  "env": {
+    "JWT_SECRET": "demo-only-secret-value-thirty-two-characters-min"
+  },
+  "build": {
+    "env": {
+      "JWT_SECRET": "demo-only-secret-value-thirty-two-characters-min"
+    }
+  }
+}
